@@ -1,50 +1,58 @@
-# Number Stories (Major System memorizer)
+# Number Stories
 
-Type a number, get one picturable word per chunk of digits, plus a short story that chains the words together. Includes a lesson for people who don't know the Major System and a practice test.
+Number Stories is a general-purpose memory-training application built around the **Major System**. It turns numbers into consonant sounds, memorable words and linked mental images. Use it to remember Pi, phone numbers, dates, codes and other numeric sequences.
 
-## Run it
+## Stack
 
-```
+- **Backend:** Python + FastAPI; existing Major System encoder, pronunciation decoder, word database and quiz endpoints are preserved.
+- **Frontend:** React + Vite.
+- **Data:** SQLite word database generated from CMU Pronouncing Dictionary and word-scoring resources.
+
+## Run the backend
+
+From the repository root:
+
+```bash
 pip install -r requirements.txt
 uvicorn app:app --reload
 ```
 
-Open http://127.0.0.1:8000
+The API is available at http://127.0.0.1:8000.
 
-The word database (`major.db`) is included. To rebuild it from scratch:
+## Run the React frontend in development
 
+Open a second terminal:
+
+```bash
+cd frontend
+npm install
+npm run dev
 ```
-python build_db.py
+
+Open the Vite address printed in the terminal (normally http://localhost:5173). The Vite development server proxies `/api` requests to FastAPI at http://127.0.0.1:8000.
+
+## Build for production
+
+```bash
+cd frontend
+npm run build
 ```
 
-## The three tabs
+Vite writes the production bundle to `frontend/dist`. FastAPI automatically serves that React build from `/` when it exists. Until a build is present, the original static page remains as a compatibility fallback.
 
-Create turns a number into words and a story. Click any small word under a card to swap it.
+## Main experiences
 
-Learn teaches the system: the digit table with memory hooks, the four rules that trip people up, a live decoder (type any word, see its number sound by sound), and a worked example.
+- **Create:** encode a number, choose 2–4 digits per word, swap alternative images, regenerate the story and copy the result.
+- **Learn:** understand the Major System sound map, learn the rules and decode a word sound by sound.
+- **Practice:** complete 10-question rounds across sound, digit, word and number exercises at easy or medium difficulty.
 
-Practice runs 10-question rounds. Question types are digit to sounds, sound to digit, word to number, and number to word (pick from four, or type your own word and it is checked). Easy uses 1 and 2 digit numbers, Medium uses 3 digit numbers and tricky spellings like soft c and ph. Wrong answers are explained and listed at the end.
+## API endpoints
 
-## How it works
+- `GET /api/encode?number=3141592&target=3`
+- `GET /api/words?digits=141&limit=40`
+- `POST /api/story`
+- `GET /api/decode?word=phone`
+- `GET /api/check-word?word=tulip&digits=159`
+- `GET /api/quiz?kind=mix&level=easy`
 
-1. `build_db.py` reads the CMU Pronouncing Dictionary and converts each word's sounds to Major System digits (T/D/TH = 1, N = 2, M = 3, R = 4, L = 5, SH/CH/J = 6, K/G = 7, F/V = 8, P/B = 9, S/Z = 0, vowels ignored).
-2. Each word is scored by how common it is (wordfreq) and how easy it is to picture (WordNet: concrete nouns like animals, objects, food and people get a bonus, verbs and adjectives a penalty). Names (Wilson, Malibu), acronyms and words WordNet doesn't know are pushed to last resort, function words (have, at, it) are blocked, and rude words are filtered out. To block more words, add them to the `STOP` set in `build_db.py` and rebuild.
-3. `major.py` splits your number into chunks (2, 3 or 4 digits per word, your choice) using a small dynamic program, picking the best-scoring word for each chunk and avoiding repeats. It also decodes any word back to digits with a sound-by-sound breakdown.
-4. `quiz.py` builds the practice questions from the same database, and checks every answer against the dictionary.
-5. A template builds the story that links the words in order.
-
-## API
-
-- `GET /api/encode?number=3141592&target=3` returns chunks, alternatives and a story
-- `GET /api/words?digits=141&limit=40` returns more words for one chunk
-- `POST /api/story` with `{"words": [...], "digits": [...], "variant": 0}` rebuilds the story
-- `GET /api/decode?word=phone` returns the number for any word, sound by sound
-- `GET /api/check-word?word=tulip&digits=159` checks whether a word stands for a number
-- `GET /api/quiz?kind=mix&level=easy` returns one practice question (kind: mix, sounds, digit, word, number)
-
-## Next steps
-
-- Replace the template story with an AI-written one (one API call per request, so add rate limits first)
-- Let users type their own word for a chunk on the Create tab
-- Add a memory-palace mode that groups the words into stops
-- Save quiz scores so people can see their progress
+The API contract is intentionally kept stable so the React client does not require a rewrite of the Python memory engine.
