@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+cmudict
+# only needed to rebuild the database with build_db.py
+wordfreq
+better-profanity
+wn==0.0.23

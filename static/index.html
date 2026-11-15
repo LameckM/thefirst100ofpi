@@ -1,0 +1,675 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Number Stories</title>
+<style>
+  :root {
+    --bg: #faf7f2; --card: #ffffff; --ink: #1d1b18; --muted: #7a746b;
+    --line: #e6dfd3; --accent: #c2410c; --accent-soft: #fde8da; --focus: #1d4ed8;
+    --good: #15803d; --good-bg: #dcfce7; --bad: #b91c1c; --bad-bg: #fee2e2;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #161412; --card: #201d1a; --ink: #f1ece4; --muted: #9a9388;
+      --line: #35302a; --accent: #f08a4b; --accent-soft: #3a2417; --focus: #8ab4ff;
+      --good: #86efac; --good-bg: #14301f; --bad: #fca5a5; --bad-bg: #3a1a1a;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  .top {
+    max-width: 860px; margin: 0 auto; padding: 22px 16px 0;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  }
+  .top h1 { margin: 0; font-size: 1.35rem; letter-spacing: -0.02em; }
+  #tabs { display: flex; gap: 4px; background: var(--card); border: 1px solid var(--line); padding: 4px; border-radius: 12px; }
+  #tabs button { border: 0; background: transparent; color: var(--muted); padding: 8px 16px; border-radius: 8px; font-weight: 600; }
+  #tabs button:hover { color: var(--ink); }
+  #tabs button[aria-current=page] { background: var(--accent-soft); color: var(--accent); }
+  main { max-width: 860px; margin: 0 auto; padding: 26px 16px 80px; }
+  h2.title { font-size: 1.8rem; margin: 0 0 4px; letter-spacing: -0.02em; }
+  .sub { color: var(--muted); margin: 0 0 24px; }
+  .bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  input[type=text] {
+    flex: 1 1 260px; min-width: 0; padding: 14px 16px; font: 1.25rem ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    background: var(--card); color: var(--ink); border: 1.5px solid var(--line); border-radius: 12px;
+  }
+  button { font: inherit; cursor: pointer; }
+  button:focus-visible, input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+  .go { padding: 14px 22px; border: 0; border-radius: 12px; background: var(--accent); color: #fff; font-weight: 600; }
+  .go:hover { filter: brightness(1.08); }
+  .go.small { padding: 9px 16px; border-radius: 10px; margin-top: 12px; }
+  .seg { display: inline-flex; flex-wrap: wrap; border: 1.5px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .seg button { padding: 8px 14px; background: var(--card); color: var(--ink); border: 0; border-right: 1px solid var(--line); }
+  .seg button:last-child { border-right: 0; }
+  .seg button[aria-pressed=true] { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+  .seglabel { color: var(--muted); font-size: .9rem; margin: 12px 8px 0 0; display: inline-block; min-width: 110px; }
+  .segrow { margin-top: 12px; display: flex; align-items: center; flex-wrap: wrap; }
+  .segrow .seglabel { margin: 0 8px 0 0; }
+  .msg { color: var(--bad); margin-top: 12px; min-height: 1.4em; }
+
+  /* create */
+  .grouped { font: 1.1rem ui-monospace, Menlo, Consolas, monospace; color: var(--muted); margin: 28px 0 14px; word-break: break-all; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; align-items: start; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
+  .card .n { font: .85rem ui-monospace, Menlo, monospace; color: var(--muted); }
+  .card .w { font-size: 1.5rem; font-weight: 700; margin: 2px 0 8px; overflow-wrap: anywhere; }
+  .alts { display: flex; flex-wrap: wrap; gap: 5px; }
+  .alts button { padding: 2px 9px; font-size: .85rem; background: transparent; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; }
+  .alts button:hover { color: var(--accent); border-color: var(--accent); }
+  .alts .more { border-style: dashed; }
+  .alts.open { max-height: 100px; overflow-y: auto; padding-right: 4px; scrollbar-width: thin; align-content: flex-start; }
+  .storyhead { display: flex; align-items: center; justify-content: space-between; margin: 36px 0 8px; gap: 8px; flex-wrap: wrap; }
+  .storyhead h2 { margin: 0; font-size: 1.25rem; }
+  .storyhead div { display: flex; gap: 8px; }
+  .ghost { padding: 8px 14px; background: var(--card); color: var(--ink); border: 1.5px solid var(--line); border-radius: 10px; }
+  .ghost:hover { border-color: var(--accent); color: var(--accent); }
+  .story { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 8px 20px; }
+  .story p { margin: 12px 0; font-size: 1.05rem; }
+  mark { background: var(--accent-soft); color: var(--accent); font-weight: 700; padding: 0 5px; border-radius: 5px; }
+  .tip { color: var(--muted); font-size: .9rem; margin-top: 14px; }
+  .newbie { margin-top: 26px; padding: 14px 16px; background: var(--accent-soft); border-radius: 12px; display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+  .newbie span { color: var(--ink); }
+  [hidden] { display: none !important; }
+
+  /* learn */
+  .step { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; margin: 16px 0; }
+  .step h3 { margin: 0 0 8px; font-size: 1.1rem; display: flex; align-items: center; gap: 10px; }
+  .step h3 i {
+    font-style: normal; display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%;
+    background: var(--accent); color: #fff; font-size: .85rem; flex: none;
+  }
+  .step p { margin: 8px 0; }
+  .scroll { overflow-x: auto; }
+  table.map { width: 100%; border-collapse: collapse; font-size: .95rem; min-width: 520px; }
+  .map th, .map td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+  .map th { color: var(--muted); font-weight: 600; font-size: .85rem; }
+  .map tr:last-child td { border-bottom: 0; }
+  .map td.d { font: 700 1.4rem ui-monospace, Menlo, monospace; color: var(--accent); width: 2.6em; }
+  .map td.s { font-weight: 700; white-space: nowrap; }
+  .map td.h { color: var(--muted); }
+  .rules { display: grid; gap: 12px; margin-top: 10px; }
+  .rule { border-left: 3px solid var(--accent); padding: 2px 0 2px 14px; }
+  .rule b { display: block; }
+  .ex { font-family: ui-monospace, Menlo, monospace; background: var(--accent-soft); color: var(--accent); padding: 0 6px; border-radius: 5px; white-space: nowrap; }
+  .pc { display: inline-flex; flex-direction: column; align-items: center; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 3px 12px; margin: 4px 6px 4px 0; font-family: ui-monospace, Menlo, monospace; }
+  .pc b { color: var(--accent); font-size: 1.15rem; }
+  .eq { font: 700 1.3rem ui-monospace, Menlo, monospace; margin-left: 4px; }
+  .res { margin-top: 12px; }
+  .res .lab { color: var(--muted); font-size: .85rem; }
+
+  /* practice */
+  .panel { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 20px; }
+  .meta { color: var(--muted); font-size: .9rem; display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+  .prompt { font-size: 1.4rem; font-weight: 700; margin: 8px 0 18px; line-height: 1.3; }
+  .opts { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  @media (max-width: 480px) { .opts { grid-template-columns: 1fr; } }
+  .opt, .dg {
+    padding: 14px; font-size: 1.1rem; font-weight: 600; background: var(--bg); color: var(--ink);
+    border: 1.5px solid var(--line); border-radius: 12px;
+  }
+  .opt:hover:not(:disabled), .dg:hover:not(:disabled) { border-color: var(--accent); }
+  .dgrid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; max-width: 460px; }
+  .dg { font: 700 1.5rem ui-monospace, Menlo, monospace; padding: 14px 0; }
+  .opt.correct, .dg.correct { border-color: var(--good); background: var(--good-bg); color: var(--good); }
+  .opt.wrong, .dg.wrong { border-color: var(--bad); background: var(--bad-bg); color: var(--bad); }
+  .opt:disabled, .dg:disabled { cursor: default; }
+  .own { margin-top: 18px; padding-top: 14px; border-top: 1px dashed var(--line); }
+  .own label { display: block; color: var(--muted); font-size: .9rem; margin-bottom: 6px; }
+  .own .row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .own input, .numrow input { flex: 1 1 160px; padding: 10px 12px; font-size: 1.05rem; }
+  .own .go, .numrow .go { padding: 10px 16px; }
+  .numrow { display: flex; gap: 8px; flex-wrap: wrap; max-width: 460px; }
+  .numrow input { font-size: 1.4rem; }
+  .fb { margin-top: 18px; padding: 14px 16px; border-radius: 12px; }
+  .fb.ok { background: var(--good-bg); color: var(--ink); border: 1px solid var(--good); }
+  .fb.no { background: var(--bad-bg); color: var(--ink); border: 1px solid var(--bad); }
+  .fb strong { display: block; margin-bottom: 4px; }
+  .fb .ex2 { font-family: ui-monospace, Menlo, monospace; font-size: .95rem; overflow-wrap: anywhere; }
+  .big { font: 800 3rem ui-monospace, Menlo, monospace; color: var(--accent); margin: 4px 0; }
+  .missed { margin: 14px 0 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+  .missed li { border-left: 3px solid var(--bad); padding: 2px 0 2px 12px; }
+  .missed .ex2 { color: var(--muted); font-family: ui-monospace, Menlo, monospace; font-size: .9rem; }
+  .row2 { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>Number Stories</h1>
+  <nav id="tabs" aria-label="Sections">
+    <button type="button" data-view="create" aria-current="page">Create</button>
+    <button type="button" data-view="learn">Learn</button>
+    <button type="button" data-view="practice">Practice</button>
+  </nav>
+</header>
+
+<main>
+<!-- ================= CREATE ================= -->
+<section id="view-create">
+  <h2 class="title">Turn a number into a story</h2>
+  <p class="sub">Type a number. Get pictures you can remember, in order, as a story.</p>
+
+  <form class="bar" id="form">
+    <input type="text" id="num" inputmode="numeric" autocomplete="off" aria-label="Number to memorize" placeholder="3.14159265358979" value="">
+    <button class="go" type="submit">Make my story</button>
+  </form>
+  <div class="segrow">
+    <span class="seglabel">Digits per word</span>
+    <span class="seg" id="seg" role="group" aria-label="Digits per word">
+      <button type="button" data-t="2" aria-pressed="false">2</button>
+      <button type="button" data-t="3" aria-pressed="true">3</button>
+      <button type="button" data-t="4" aria-pressed="false">4</button>
+    </span>
+  </div>
+  <div id="msg" class="msg" role="alert"></div>
+
+  <section id="result" hidden>
+    <div class="grouped" id="grouped"></div>
+    <div class="cards" id="cards"></div>
+    <div class="storyhead">
+      <h2>Your story</h2>
+      <div>
+        <button class="ghost" id="again" type="button">Another story</button>
+        <button class="ghost" id="copy" type="button">Copy</button>
+      </div>
+    </div>
+    <div class="story" id="story"></div>
+    <p class="tip">Tap any small word under a card to swap it. Pick the one that gives you the clearest picture.
+       Then walk a route you know and drop one scene at each stop.</p>
+  </section>
+
+  <div class="newbie">
+    <span>New to the Major System? You need the table below to turn your pictures back into digits.</span>
+    <button class="ghost" type="button" data-go="learn">Learn it in 5 minutes</button>
+  </div>
+</section>
+
+<!-- ================= LEARN ================= -->
+<section id="view-learn" hidden>
+  <h2 class="title">Learn the Major System</h2>
+  <p class="sub">Five minutes. After this, any number becomes a handful of pictures.</p>
+
+  <div class="step">
+    <h3><i>1</i>The big idea</h3>
+    <p>Your brain is bad at digits and great at pictures. A long number like 314159 is hard to hold, but a mother holding a giant tulip is easy.</p>
+    <p>The Major System is a code that turns every digit into a consonant sound. String a few sounds together, add any vowels you like, and you get a word. Words become pictures, and pictures become a story you can replay to get the digits back.</p>
+  </div>
+
+  <div class="step">
+    <h3><i>2</i>The code: ten digits, ten sounds</h3>
+    <p>Learn this table and you know the whole system. The memory hooks make it stick fast.</p>
+    <div class="scroll">
+    <table class="map">
+      <thead><tr><th>Digit</th><th>Sounds</th><th>Memory hook</th><th>Example</th></tr></thead>
+      <tbody>
+        <tr><td class="d">0</td><td class="s">s, z</td><td class="h">Zero starts with z.</td><td><span class="ex">sea = 0</span></td></tr>
+        <tr><td class="d">1</td><td class="s">t, d, th</td><td class="h">A t has one downstroke.</td><td><span class="ex">tie = 1</span></td></tr>
+        <tr><td class="d">2</td><td class="s">n</td><td class="h">An n has two legs.</td><td><span class="ex">hen = 2</span></td></tr>
+        <tr><td class="d">3</td><td class="s">m</td><td class="h">An m has three legs.</td><td><span class="ex">ham = 3</span></td></tr>
+        <tr><td class="d">4</td><td class="s">r</td><td class="h">R is the last letter of four.</td><td><span class="ex">ray = 4</span></td></tr>
+        <tr><td class="d">5</td><td class="s">l</td><td class="h">L is the Roman numeral for 50.</td><td><span class="ex">owl = 5</span></td></tr>
+        <tr><td class="d">6</td><td class="s">j, ch, sh</td><td class="h">A flipped 6 looks like a j.</td><td><span class="ex">shoe = 6</span></td></tr>
+        <tr><td class="d">7</td><td class="s">k, g (hard)</td><td class="h">A capital K is built from two 7s.</td><td><span class="ex">key = 7</span></td></tr>
+        <tr><td class="d">8</td><td class="s">f, v</td><td class="h">A handwritten f has two loops, like an 8.</td><td><span class="ex">ivy = 8</span></td></tr>
+        <tr><td class="d">9</td><td class="s">p, b</td><td class="h">A flipped 9 looks like a p.</td><td><span class="ex">bee = 9</span></td></tr>
+      </tbody>
+    </table>
+    </div>
+  </div>
+
+  <div class="step">
+    <h3><i>3</i>Four rules that trip people up</h3>
+    <div class="rules">
+      <div class="rule"><b>Sounds count, spelling does not.</b>
+        Say the word out loud. <span class="ex">knee = 2</span> because the k is silent. <span class="ex">phone = 82</span> because ph sounds like f.
+        A c can go either way: <span class="ex">city = 01</span> (soft c sounds like s) but <span class="ex">cat = 71</span> (hard c sounds like k). Same for g: <span class="ex">gem = 63</span> but <span class="ex">go = 7</span>.</div>
+      <div class="rule"><b>Vowels, w, h and y are ignored.</b>
+        They only help you build a word. <span class="ex">hen = 2</span>, and <span class="ex">wheat = 1</span>.</div>
+      <div class="rule"><b>A double letter that makes one sound counts once.</b>
+        <span class="ex">ball = 95</span> and <span class="ex">buzz = 90</span>. But two separate sounds each count: <span class="ex">mommy = 33</span>.</div>
+      <div class="rule"><b>Two letters that need care.</b>
+        ng counts as just n, so <span class="ex">king = 72</span>. And x is really k plus s, so it counts as two digits: <span class="ex">box = 970</span>.</div>
+    </div>
+  </div>
+
+  <div class="step">
+    <h3><i>4</i>Try it: type any word</h3>
+    <p>See exactly how a word turns into a number.</p>
+    <form class="bar" id="decform">
+      <input type="text" id="decword" autocomplete="off" spellcheck="false" aria-label="A word to decode" placeholder="phone" maxlength="40">
+      <button class="go" type="submit">Decode</button>
+    </form>
+    <div id="decout" class="res" aria-live="polite"></div>
+  </div>
+
+  <div class="step">
+    <h3><i>5</i>From a number to a story</h3>
+    <p>Say you need to remember <span class="ex">314159</span>. Split it into 314 and 159.</p>
+    <p>314 is m, th, r, which gives <span class="ex">mother</span>. 159 is t, l, p, which gives <span class="ex">tulip</span>. Now make a scene: your mother is holding a giant tulip. Two pictures, six digits.</p>
+    <p>To get the number back, see the scene, say the words, and decode each one: mother is 314, tulip is 159.</p>
+  </div>
+
+  <div class="step">
+    <h3><i>6</i>Make it stick</h3>
+    <p>Make every scene strange and physical. A normal mother holding a normal tulip fades. A mother the size of a bus swinging a flaming tulip does not.</p>
+    <p>For long numbers, walk a route you know well, like your house, and leave one scene at each stop. Walking the route in your head replays the digits in order.</p>
+    <p>Review the next day, then three days later, then a week later. Spacing it out is what moves it into long-term memory.</p>
+  </div>
+
+  <div class="row2">
+    <button class="go" type="button" data-go="practice">Test yourself</button>
+    <button class="ghost" type="button" data-go="create">Make a story from a number</button>
+  </div>
+</section>
+
+<!-- ================= PRACTICE ================= -->
+<section id="view-practice" hidden>
+  <h2 class="title">Practice</h2>
+  <p class="sub">Ten questions per round. Wrong answers get explained so you learn the code, not just the answer.</p>
+
+  <div id="psetup" class="panel">
+    <div class="segrow">
+      <span class="seglabel">What to practice</span>
+      <span class="seg" id="pk" role="group" aria-label="Question type">
+        <button type="button" data-v="mix" aria-pressed="true">Everything</button>
+        <button type="button" data-v="sounds" aria-pressed="false">Digit to sounds</button>
+        <button type="button" data-v="digit" aria-pressed="false">Sound to digit</button>
+        <button type="button" data-v="word" aria-pressed="false">Word to number</button>
+        <button type="button" data-v="number" aria-pressed="false">Number to word</button>
+      </span>
+    </div>
+    <div class="segrow">
+      <span class="seglabel">Level</span>
+      <span class="seg" id="pl" role="group" aria-label="Level">
+        <button type="button" data-v="easy" aria-pressed="true">Easy</button>
+        <button type="button" data-v="medium" aria-pressed="false">Medium</button>
+      </span>
+    </div>
+    <p class="tip">Easy uses 1 and 2 digit numbers and the plain table. Medium uses 3 digit numbers and tricky spellings like soft c and ph.</p>
+    <button class="go" id="pstart" type="button">Start 10 questions</button>
+    <div id="pmsg" class="msg" role="alert"></div>
+  </div>
+
+  <div id="pquiz" class="panel" hidden>
+    <div class="meta"><span id="pprog"></span><button class="ghost" id="pquit" type="button">Quit round</button></div>
+    <div id="qbox"></div>
+  </div>
+
+  <div id="presult" class="panel" hidden>
+    <div class="meta"><span>Round finished</span></div>
+    <div class="big" id="pscore"></div>
+    <p id="pnote"></p>
+    <div id="pmissed"></div>
+    <div class="row2">
+      <button class="go" id="pagain" type="button">Another round</button>
+      <button class="ghost" id="psettings" type="button">Change settings</button>
+      <button class="ghost" type="button" data-go="learn">Back to the lesson</button>
+    </div>
+  </div>
+</section>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+function el(tag, cls, text) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text !== undefined) e.textContent = text;
+  return e;
+}
+
+async function api(url, opts) {
+  const r = await fetch(url, opts);
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(typeof j.detail === "string" ? j.detail : "Something went wrong.");
+  return j;
+}
+
+/* ---------------- tabs ---------------- */
+const VIEWS = ["create", "learn", "practice"];
+function show(view) {
+  if (!VIEWS.includes(view)) view = "create";
+  VIEWS.forEach((v) => { $("view-" + v).hidden = v !== view; });
+  document.querySelectorAll("#tabs button").forEach((b) => {
+    if (b.dataset.view === view) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
+  });
+  history.replaceState(null, "", location.pathname + location.search + "#" + view);
+  window.scrollTo(0, 0);
+}
+document.querySelectorAll("#tabs button").forEach((b) => b.addEventListener("click", () => show(b.dataset.view)));
+document.querySelectorAll("[data-go]").forEach((b) => b.addEventListener("click", () => show(b.dataset.go)));
+
+/* ---------------- create ---------------- */
+const state = { chunks: [], variant: 0, target: 3, sentences: [] };
+const SHOWN_ALTS = 5;
+
+function setMsg(t) { $("msg").textContent = t || ""; }
+
+function renderCards() {
+  const box = $("cards");
+  box.replaceChildren();
+  state.chunks.forEach((c, i) => {
+    const card = el("div", "card");
+    const alts = el("div", c.expanded ? "alts open" : "alts");
+    const others = c.alternatives.filter((a) => a !== c.word);
+    (c.expanded ? others : others.slice(0, SHOWN_ALTS)).forEach((a) => {
+      const b = el("button", "", a);
+      b.type = "button";
+      b.addEventListener("click", () => swap(i, a));
+      alts.appendChild(b);
+    });
+    if (!c.expanded) {
+      const m = el("button", "more", "more");
+      m.type = "button";
+      m.addEventListener("click", () => expand(i));
+      alts.appendChild(m);
+    }
+    card.append(el("div", "n", c.digits), el("div", "w", c.word), alts);
+    box.appendChild(card);
+  });
+}
+
+function renderStory(sentences) {
+  state.sentences = sentences;
+  const box = $("story");
+  box.replaceChildren();
+  const re = /\[\[([^\]|]+)\|?([^\]]*)\]\]/g;
+  sentences.forEach((s) => {
+    const p = document.createElement("p");
+    let last = 0, m;
+    re.lastIndex = 0;
+    while ((m = re.exec(s)) !== null) {
+      p.append(document.createTextNode(s.slice(last, m.index)));
+      const mk = el("mark", "", m[1]);
+      if (m[2]) mk.title = m[2];
+      p.append(mk);
+      last = m.index + m[0].length;
+    }
+    p.append(document.createTextNode(s.slice(last)));
+    box.appendChild(p);
+  });
+}
+
+async function refreshStory() {
+  const j = await api("/api/story", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      words: state.chunks.map((c) => c.word),
+      digits: state.chunks.map((c) => c.digits),
+      variant: state.variant,
+    }),
+  });
+  renderStory(j.story);
+}
+
+async function swap(i, word) {
+  state.chunks[i].word = word;
+  renderCards();
+  try { await refreshStory(); } catch (e) { setMsg(e.message); }
+}
+
+async function expand(i) {
+  try {
+    const j = await api(`/api/words?digits=${state.chunks[i].digits}&limit=40`);
+    state.chunks[i].alternatives = j.words;
+    state.chunks[i].expanded = true;
+    renderCards();
+  } catch (e) { setMsg(e.message); }
+}
+
+async function encode() {
+  setMsg("");
+  const number = $("num").value.trim();
+  if (!number) { setMsg("Type a number first."); return; }
+  try {
+    const j = await api(`/api/encode?number=${encodeURIComponent(number)}&target=${state.target}`);
+    state.chunks = j.chunks;
+    state.variant = 0;
+    $("grouped").textContent = j.grouped;
+    renderCards();
+    renderStory(j.story);
+    $("result").hidden = false;
+  } catch (e) { setMsg(e.message); }
+}
+
+$("form").addEventListener("submit", (e) => { e.preventDefault(); encode(); });
+
+$("seg").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-t]");
+  if (!b) return;
+  state.target = Number(b.dataset.t);
+  document.querySelectorAll("#seg button").forEach((x) => x.setAttribute("aria-pressed", x === b ? "true" : "false"));
+  if ($("num").value.trim()) encode();
+});
+
+$("again").addEventListener("click", async () => {
+  state.variant += 1;
+  try { await refreshStory(); } catch (e) { setMsg(e.message); }
+});
+
+$("copy").addEventListener("click", async () => {
+  const plain = state.sentences.map((s) => s.replace(/\[\[([^\]|]+)\|?[^\]]*\]\]/g, "$1")).join(" ");
+  const list = state.chunks.map((c) => `${c.digits} = ${c.word}`).join("\n");
+  try {
+    await navigator.clipboard.writeText(`${$("grouped").textContent}\n\n${list}\n\n${plain}`);
+    $("copy").textContent = "Copied";
+    setTimeout(() => ($("copy").textContent = "Copy"), 1500);
+  } catch { setMsg("Copy failed. Select the text and copy it by hand."); }
+});
+
+/* ---------------- learn: decoder ---------------- */
+function stepChips(o) {
+  const row = el("div");
+  o.steps.forEach((s) => {
+    const pc = el("span", "pc");
+    pc.append(el("span", "", s.sound), el("b", "", s.digit));
+    row.appendChild(pc);
+  });
+  row.appendChild(el("span", "eq", "= " + (o.digits || "no number")));
+  return row;
+}
+
+$("decform").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const out = $("decout");
+  const w = $("decword").value.trim();
+  out.replaceChildren();
+  if (!w) return;
+  try {
+    const j = await api(`/api/decode?word=${encodeURIComponent(w)}`);
+    if (!j.found) { out.append(el("p", "", "I don't know that word. Try a simpler spelling or another word.")); return; }
+    j.options.forEach((o, i) => {
+      const box = el("div", "res");
+      if (j.options.length > 1) box.append(el("div", "lab", `Way ${i + 1} of saying “${j.word}”`));
+      else box.append(el("div", "lab", `How “${j.word}” breaks down`));
+      box.append(stepChips(o));
+      if (!o.steps.length) box.append(el("p", "", "This word has no consonant sounds, so it carries no number."));
+      out.append(box);
+    });
+  } catch (err) { out.append(el("p", "msg", err.message)); }
+});
+
+/* ---------------- practice ---------------- */
+const P = { kind: "mix", level: "easy", total: 10, n: 0, score: 0, missed: [], q: null, done: false };
+
+function bindSeg(id, key) {
+  $(id).addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-v]");
+    if (!b) return;
+    P[key] = b.dataset.v;
+    $(id).querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", x === b ? "true" : "false"));
+  });
+}
+bindSeg("pk", "kind");
+bindSeg("pl", "level");
+
+function startRound() {
+  P.n = 0; P.score = 0; P.missed = [];
+  $("psetup").hidden = true; $("presult").hidden = true; $("pquiz").hidden = false;
+  $("pmsg").textContent = "";
+  nextQ();
+}
+
+async function nextQ() {
+  P.n += 1; P.done = false;
+  try {
+    P.q = await api(`/api/quiz?kind=${P.kind}&level=${P.level}`);
+  } catch (e) {
+    P.n -= 1;
+    $("pquiz").hidden = true; $("psetup").hidden = false;
+    $("pmsg").textContent = e.message;
+    return;
+  }
+  renderQ();
+}
+
+function progress() { $("pprog").textContent = `Question ${P.n} of ${P.total}  ·  Score ${P.score}`; }
+
+function renderQ() {
+  const q = P.q, box = $("qbox");
+  box.replaceChildren();
+  progress();
+  box.append(el("p", "prompt", q.prompt));
+
+  if (q.type === "choice") {
+    const w = el("div", "opts");
+    q.options.forEach((o) => {
+      const b = el("button", "opt", o);
+      b.type = "button";
+      b.addEventListener("click", () => answer(o === q.answer, o));
+      w.append(b);
+    });
+    box.append(w);
+  } else if (q.type === "digit-grid") {
+    const w = el("div", "dgrid");
+    "0123456789".split("").forEach((d) => {
+      const b = el("button", "dg", d);
+      b.type = "button";
+      b.addEventListener("click", () => answer(d === q.answer, d));
+      w.append(b);
+    });
+    box.append(w);
+  } else if (q.type === "number-input") {
+    const f = el("form", "numrow");
+    const inp = el("input");
+    inp.type = "text"; inp.inputMode = "numeric"; inp.autocomplete = "off"; inp.setAttribute("aria-label", "Your answer");
+    inp.placeholder = "digits";
+    const go = el("button", "go", "Check");
+    go.type = "submit";
+    f.append(inp, go);
+    f.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const v = inp.value.replace(/\D/g, "");
+      if (!v || P.done) return;
+      answer(q.accepted.includes(v), v);
+    });
+    box.append(f);
+    setTimeout(() => inp.focus(), 0);
+  }
+
+  if (q.own_word) {
+    const own = el("div", "own");
+    own.append(el("label", "", "Or think of your own word for " + q.digits + " and check it:"));
+    const row = el("form", "row");
+    const inp = el("input");
+    inp.type = "text"; inp.autocomplete = "off"; inp.spellcheck = false; inp.maxLength = 40;
+    inp.setAttribute("aria-label", "Your own word");
+    const go = el("button", "go", "Check my word");
+    go.type = "submit";
+    const msg = el("div", "msg");
+    row.append(inp, go);
+    row.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const w = inp.value.trim();
+      if (!w || P.done) return;
+      msg.textContent = "";
+      try {
+        const r = await api(`/api/check-word?word=${encodeURIComponent(w)}&digits=${q.digits}`);
+        if (!r.found) msg.textContent = "I don't know that word. Try another.";
+        else if (r.ok) {
+          const parts = r.steps.map((s) => `${s.sound}=${s.digit}`).join(" · ");
+          P.q = { ...q, explanation: `Nice word. ${r.word}: ${parts} → ${r.digits}` };
+          answer(true, null);
+        } else msg.textContent = `“${r.word}” works out to ${r.digits || "no number"}, not ${q.digits}. Try again.`;
+      } catch (err) { msg.textContent = err.message; }
+    });
+    own.append(row, msg);
+    box.append(own);
+  }
+
+  const fb = el("div", "fb");
+  fb.id = "fb"; fb.hidden = true; fb.setAttribute("aria-live", "polite");
+  box.append(fb);
+}
+
+function answer(correct, picked) {
+  if (P.done) return;
+  P.done = true;
+  const q = P.q;
+  if (correct) P.score += 1;
+  else P.missed.push({ prompt: q.prompt, answer: q.answer, explanation: q.explanation });
+  progress();
+
+  const box = $("qbox");
+  box.querySelectorAll(".opt, .dg").forEach((b) => {
+    b.disabled = true;
+    if (b.textContent === q.answer) b.classList.add("correct");
+    else if (!correct && b.textContent === picked) b.classList.add("wrong");
+  });
+  box.querySelectorAll("input, .own button, .numrow button").forEach((x) => { x.disabled = true; });
+
+  const fb = $("fb");
+  fb.hidden = false;
+  fb.className = "fb " + (correct ? "ok" : "no");
+  fb.replaceChildren(
+    el("strong", "", correct ? "Correct." : `Not quite. The answer is ${q.answer}.`),
+    el("div", "ex2", q.explanation)
+  );
+  const last = P.n >= P.total;
+  const nx = el("button", "go small", last ? "See results" : "Next question");
+  nx.type = "button";
+  nx.addEventListener("click", last ? showResults : nextQ);
+  fb.append(nx);
+  nx.focus();
+}
+
+function showResults() {
+  $("pquiz").hidden = true; $("presult").hidden = false;
+  $("pscore").textContent = `${P.score} / ${P.total}`;
+  const s = P.score;
+  $("pnote").textContent = s === P.total ? "Perfect round."
+    : s >= 8 ? "Strong. A couple more rounds and this will be automatic."
+    : s >= 5 ? "Getting there. Check the table in the Learn tab for the ones you missed."
+    : "Early days. Re-read the table and hooks in the Learn tab, then try an easy round again.";
+  const box = $("pmissed");
+  box.replaceChildren();
+  if (P.missed.length) {
+    box.append(el("strong", "", "What you missed"));
+    const ul = el("ul", "missed");
+    P.missed.forEach((m) => {
+      const li = el("li");
+      li.append(el("div", "", m.prompt), el("div", "", "Answer: " + m.answer), el("div", "ex2", m.explanation));
+      ul.append(li);
+    });
+    box.append(ul);
+  }
+}
+
+$("pstart").addEventListener("click", startRound);
+$("pagain").addEventListener("click", startRound);
+$("psettings").addEventListener("click", () => { $("presult").hidden = true; $("psetup").hidden = false; });
+$("pquit").addEventListener("click", () => { $("pquiz").hidden = true; $("psetup").hidden = false; });
+
+/* ---------------- start up ---------------- */
+const preset = new URLSearchParams(location.search).get("n");
+if (preset) { $("num").value = preset; encode(); show("create"); }
+else show(location.hash.replace("#", "") || "create");
+</script>
+</body>
+</html>
