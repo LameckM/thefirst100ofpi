@@ -15,14 +15,14 @@ class FixedWidthSegmentationTests(unittest.TestCase):
             "INSERT INTO words (word, digits, score) VALUES (?, ?, ?)",
             [
                 ("tar", "14", 8.0), ("tile", "15", 8.0),
-                ("pan", "92", 8.0), ("jail", "65", 8.0),
+                ("pan", "92", 8.0), ("jail", "65", 8.0), ("fob", "89", 8.0),
                 ("mail", "35", 8.0), ("leafbuoy", "589", 8.0),
                 ("tarot", "141", 8.0), ("plan", "592", 8.0),
                 ("slim", "653", 8.0), ("lifebuoy", "589", 8.0),
                 ("tire", "14", 7.0), ("tile", "15", 7.0),
                 ("panel", "925", 7.0),
-                ("tarot", "1415", 7.0), ("plaid", "9265", 7.0),
-                ("flamb", "3589", 7.0),
+                ("turtle", "1415", 7.0), ("punchily", "9265", 7.0),
+                ("mollifob", "3589", 7.0),\n                ("one", "12", 7.0), ("more", "34", 7.0), ("law", "5", 7.0),
             ],
         )
 
