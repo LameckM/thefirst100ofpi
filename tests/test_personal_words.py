@@ -1,5 +1,6 @@
 import sqlite3
 import unittest
+from unittest.mock import patch
 
 from major import (
     delete_personal_word,
@@ -39,10 +40,15 @@ class PersonalWordLibraryTests(unittest.TestCase):
         self.assertEqual(validate_personal_word("wordnotindictionaryxyz", "589"), (True, "custom"))
 
     def test_known_word_must_match_dictionary_pronunciation(self):
-        self.assertEqual(validate_personal_word("tarot", "141"), (True, "dictionary"))
-        valid, mapping = validate_personal_word("tarot", "999")
-        self.assertFalse(valid)
-        self.assertEqual(mapping, "141")
+        dictionary_options = [{"digits": "141", "steps": []}]
+        with patch("major.decode_word", return_value=dictionary_options):
+            self.assertEqual(
+                validate_personal_word("testword", "141"),
+                (True, "dictionary"),
+            )
+            valid, mapping = validate_personal_word("testword", "999")
+            self.assertFalse(valid)
+            self.assertEqual(mapping, "141")
 
     def test_delete_personal_word(self):
         save_personal_word(self.conn, "myword", "141")
