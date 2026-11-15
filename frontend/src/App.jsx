@@ -85,8 +85,8 @@ export default function App() {
   const value=(customWords[digits]||"").trim();
   if(!value){setCustomMessages(v=>({...v,[digits]:"Enter a word first."}));return;}
   try {
-   await api("/api/personal-words",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({word:value,digits})});
-   setCustomMessages(v=>({...v,[digits]:"Saved to your Personal Word Library."}));
+   const saved=await api("/api/personal-words",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({word:value,digits})});
+   setCustomMessages(v=>({...v,[digits]:saved.verification==="dictionary"?"Saved — pronunciation verified by the dictionary.":"Saved as a custom mapping. Check that the spoken consonant sounds match "+digits+"."}));
    const updated=await api("/api/encode?number="+encodeURIComponent(number)+"&target="+target);
    setResult(updated);
    if(libraryOpen)loadLibrary();
