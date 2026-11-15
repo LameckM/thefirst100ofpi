@@ -124,15 +124,13 @@ def segment(conn, digits, target=3, max_len=4, alt_count=12):
     for i in range(0, len(digits), target):
         chunk_digits = digits[i:i + target]
         candidates = words_for(conn, chunk_digits, alt_count)
-        if not candidates:
-            # Do not silently change the requested grouping to find an
-            # easier word: that would make the selected chunk size unreliable.
-            return []
-        pick = next((item for item in candidates if item["word"] not in used), candidates[0])
-        used.add(pick["word"])
+        pick = next((item for item in candidates if item["word"] not in used), candidates[0] if candidates else None)
+        if pick:
+            used.add(pick["word"])
         chunks.append({
             "digits": chunk_digits,
-            "word": pick["word"],
+            # Preserve the exact number boundary even without a dictionary match.
+            "word": pick["word"] if pick else "",
             "alternatives": [item["word"] for item in candidates],
         })
     return chunks
