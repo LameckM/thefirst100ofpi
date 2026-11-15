@@ -28,7 +28,7 @@ class StoryRequest(BaseModel):
 
 
 @app.get("/api/encode")
-def encode(number: str = Query(..., min_length=1), target: int = Query(3, ge=1, le=4)):
+def encode(number: str = Query(..., min_length=1), target: int = Query(3, ge=2, le=4)):
     digits = clean_number(number)
     if not digits:
         raise HTTPException(400, "Enter at least one digit.")
