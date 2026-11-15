@@ -40,6 +40,25 @@ npm run build
 
 Vite writes the production bundle to `frontend/dist`. FastAPI automatically serves that React build from `/` when it exists. Until a build is present, the original static page remains as a compatibility fallback.
 
+## Dictionary and Personal Word Library
+
+The generated word database now stores every distinct usable pronunciation for a word, rather than only its first pronunciation. This improves coverage for number groups with alternate spoken forms.
+
+To rebuild the dictionary after updating the project dependencies:
+
+```bash
+python build_db.py
+```
+
+The rebuild replaces the generated dictionary but preserves the `personal_words` table, so saved custom words are not erased.
+
+When a suggested word is missing or does not suit you, add a custom word to that number group in the Create view. The API checks its CMU pronunciation against the exact digit group before saving it. Saved words are stored in the local `major.db` database and are preferred in future encodings on that installation.
+
+Personal-word endpoints:
+- `GET /api/personal-words`
+- `POST /api/personal-words` with `{"word":"tarot","digits":"141"}`
+- `DELETE /api/personal-words?word=tarot&digits=141`
+
 ## Main experiences
 
 - **Create:** encode a number, choose 2–4 digits per word, swap alternative images, regenerate the story and copy the result.
