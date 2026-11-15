@@ -109,57 +109,31 @@ def clean_number(raw):
 
 
 def segment(conn, digits, target=3, max_len=4, alt_count=12):
-    """Split `digits` into chunks and pick a word for each.
+    """Split digits into consecutive, fixed-width chunks.
 
-    Cost per chunk = (11 - word score) + 3 * |len - target|, so the split
-    leans toward `target` digits per word but will bend for a better word.
+    The selected target is a grouping size, not a scoring preference:
+    target=2 gives 14-15-92..., target=3 gives 141-592..., etc.
+    A final short chunk is retained when the input length is not divisible
+    by target. Every word candidate must encode that exact chunk.
     """
-    n = len(digits)
-    cache = {}
+    if target not in (2, 3, 4):
+        raise ValueError("target must be 2, 3, or 4")
 
-    def cands(i, L):
-        key = (i, L)
-        if key not in cache:
-            cache[key] = words_for(conn, digits[i:i + L], alt_count)
-        return cache[key]
-
-    INF = float("inf")
-    best = [INF] * (n + 1)
-    back = [None] * (n + 1)
-    best[0] = 0.0
-    for i in range(n):
-        if best[i] == INF:
-            continue
-        for L in range(1, min(max_len, n - i) + 1):
-            c = cands(i, L)
-            if not c:
-                continue
-            weak = max(0.0, 6.0 - c[0]["score"])   # steer away from poor words when a split avoids them
-            cost = (11 - c[0]["score"]) + 3 * abs(L - target) + weak * weak
-            if best[i] + cost < best[i + L]:
-                best[i + L] = best[i] + cost
-                back[i + L] = (i, L)
-
-    if best[n] == INF:
-        return []
-
-    spans = []
-    j = n
-    while j > 0:
-        i, L = back[j]
-        spans.append((i, L))
-        j = i
-    spans.reverse()
-
-    chunks, used = [], set()
-    for i, L in spans:
-        alts = cands(i, L)
-        pick = next((a for a in alts if a["word"] not in used), alts[0])
+    chunks = []
+    used = set()
+    for i in range(0, len(digits), target):
+        chunk_digits = digits[i:i + target]
+        candidates = words_for(conn, chunk_digits, alt_count)
+        if not candidates:
+            # Do not silently change the requested grouping to find an
+            # easier word: that would make the selected chunk size unreliable.
+            return []
+        pick = next((item for item in candidates if item["word"] not in used), candidates[0])
         used.add(pick["word"])
         chunks.append({
-            "digits": digits[i:i + L],
+            "digits": chunk_digits,
             "word": pick["word"],
-            "alternatives": [a["word"] for a in alts],
+            "alternatives": [item["word"] for item in candidates],
         })
     return chunks
 
