@@ -37,7 +37,8 @@ def encode(number: str = Query(..., min_length=1), target: int = Query(3, ge=2, 
     chunks = segment(conn, digits, target=target)
     if not chunks:
         raise HTTPException(422, "Could not find words for that number.")
-    story = build_story([c["word"] for c in chunks], [c["digits"] for c in chunks])
+    matched = [c for c in chunks if c["word"]]
+    story = build_story([c["word"] for c in matched], [c["digits"] for c in matched])
     return {"digits": digits, "grouped": "-".join(c["digits"] for c in chunks),
             "chunks": chunks, "story": story}
 
@@ -49,12 +50,17 @@ def more_words(digits: str = Query(..., pattern=r"^\d{1,4}$"), limit: int = Quer
 
 @app.post("/api/story")
 def story(req: StoryRequest):
-    words = [w.strip().lower() for w in req.words if w.strip()]
-    if not words or len(words) > 120:
-        raise HTTPException(400, "Send between 1 and 120 words.")
-    if req.digits is not None and len(req.digits) != len(words):
+    if req.digits is not None and len(req.digits) != len(req.words):
         raise HTTPException(400, "The digits list must contain one entry per word.")
-    return {"story": build_story(words, req.digits, req.variant)}
+    pairs = [
+        (word.strip().lower(), req.digits[i] if req.digits is not None else "")
+        for i, word in enumerate(req.words)
+        if word and word.strip()
+    ]
+    if not pairs or len(pairs) > 120:
+        raise HTTPException(400, "Send between 1 and 120 non-empty words.")
+    words, digits = zip(*pairs)
+    return {"story": build_story(list(words), list(digits), req.variant)}
 
 
 WORD_RE = r"^[A-Za-z'\-]{1,40}$"
