@@ -36,7 +36,7 @@ class PersonalWordLibraryTests(unittest.TestCase):
         self.assertEqual(personal_words_for(self.conn, "142"), [])
 
     def test_unknown_word_can_be_saved_as_user_confirmed_mapping(self):
-        self.assertEqual(validate_personal_word("lifebuoy", "589"), (True, "custom"))
+        self.assertEqual(validate_personal_word("wordnotindictionaryxyz", "589"), (True, "custom"))
 
     def test_known_word_must_match_dictionary_pronunciation(self):
         self.assertEqual(validate_personal_word("tarot", "141"), (True, "dictionary"))
