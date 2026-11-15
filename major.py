@@ -97,11 +97,52 @@ def connect():
 
 
 def words_for(conn, digits, limit=12):
+    # A word may have more than one CMU pronunciation. Return it once per
+    # digit sequence, keeping its best score.
     rows = conn.execute(
-        "SELECT word, score FROM words WHERE digits = ? ORDER BY score DESC, word LIMIT ?",
+        "SELECT word, MAX(score) AS score FROM words "
+        "WHERE digits = ? GROUP BY word ORDER BY score DESC, word LIMIT ?",
         (digits, limit),
     ).fetchall()
     return [{"word": r["word"], "score": round(r["score"], 2)} for r in rows]
+
+
+def ensure_personal_words(conn):
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS personal_words ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+        "word TEXT NOT NULL, digits TEXT NOT NULL, "
+        "created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, "
+        "UNIQUE(word, digits))"
+    )
+    conn.commit()
+
+
+def personal_words_for(conn, digits, limit=40):
+    ensure_personal_words(conn)
+    rows = conn.execute(
+        "SELECT word FROM personal_words WHERE digits = ? "
+        "ORDER BY created_at DESC, word LIMIT ?", (digits, limit)
+    ).fetchall()
+    return [r["word"] for r in rows]
+
+
+def save_personal_word(conn, word, digits):
+    ensure_personal_words(conn)
+    conn.execute(
+        "INSERT OR IGNORE INTO personal_words (word, digits) VALUES (?, ?)",
+        (word, digits),
+    )
+    conn.commit()
+
+
+def delete_personal_word(conn, word, digits):
+    ensure_personal_words(conn)
+    conn.execute(
+        "DELETE FROM personal_words WHERE word = ? AND digits = ?",
+        (word, digits),
+    )
+    conn.commit()
 
 
 def clean_number(raw):
@@ -109,57 +150,36 @@ def clean_number(raw):
 
 
 def segment(conn, digits, target=3, max_len=4, alt_count=12):
-    """Split `digits` into chunks and pick a word for each.
+    """Split digits into consecutive, fixed-width chunks.
 
-    Cost per chunk = (11 - word score) + 3 * |len - target|, so the split
-    leans toward `target` digits per word but will bend for a better word.
+    The selected target is a grouping size, not a scoring preference:
+    target=2 gives 14-15-92..., target=3 gives 141-592..., etc.
+    A final short chunk is retained when the input length is not divisible
+    by target. Every word candidate must encode that exact chunk.
     """
-    n = len(digits)
-    cache = {}
+    if target not in (2, 3, 4):
+        raise ValueError("target must be 2, 3, or 4")
 
-    def cands(i, L):
-        key = (i, L)
-        if key not in cache:
-            cache[key] = words_for(conn, digits[i:i + L], alt_count)
-        return cache[key]
-
-    INF = float("inf")
-    best = [INF] * (n + 1)
-    back = [None] * (n + 1)
-    best[0] = 0.0
-    for i in range(n):
-        if best[i] == INF:
-            continue
-        for L in range(1, min(max_len, n - i) + 1):
-            c = cands(i, L)
-            if not c:
-                continue
-            weak = max(0.0, 6.0 - c[0]["score"])   # steer away from poor words when a split avoids them
-            cost = (11 - c[0]["score"]) + 3 * abs(L - target) + weak * weak
-            if best[i] + cost < best[i + L]:
-                best[i + L] = best[i] + cost
-                back[i + L] = (i, L)
-
-    if best[n] == INF:
-        return []
-
-    spans = []
-    j = n
-    while j > 0:
-        i, L = back[j]
-        spans.append((i, L))
-        j = i
-    spans.reverse()
-
-    chunks, used = [], set()
-    for i, L in spans:
-        alts = cands(i, L)
-        pick = next((a for a in alts if a["word"] not in used), alts[0])
-        used.add(pick["word"])
+    chunks = []
+    used = set()
+    for i in range(0, len(digits), target):
+        chunk_digits = digits[i:i + target]
+        personal = [
+            {"word": word, "score": 10_000.0}
+            for word in personal_words_for(conn, chunk_digits, alt_count)
+        ]
+        candidates = personal + [
+            item for item in words_for(conn, chunk_digits, alt_count)
+            if item["word"] not in {saved["word"] for saved in personal}
+        ]
+        pick = next((item for item in candidates if item["word"] not in used), candidates[0] if candidates else None)
+        if pick:
+            used.add(pick["word"])
         chunks.append({
-            "digits": digits[i:i + L],
-            "word": pick["word"],
-            "alternatives": [a["word"] for a in alts],
+            "digits": chunk_digits,
+            # Preserve the exact number boundary even without a dictionary match.
+            "word": pick["word"] if pick else "",
+            "alternatives": [item["word"] for item in candidates],
         })
     return chunks
 
