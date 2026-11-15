@@ -97,8 +97,11 @@ def connect():
 
 
 def words_for(conn, digits, limit=12):
+    # A word may have more than one CMU pronunciation. Return it once per
+    # digit sequence, keeping its best score.
     rows = conn.execute(
-        "SELECT word, score FROM words WHERE digits = ? ORDER BY score DESC, word LIMIT ?",
+        "SELECT word, MAX(score) AS score FROM words "
+        "WHERE digits = ? GROUP BY word ORDER BY score DESC, word LIMIT ?",
         (digits, limit),
     ).fetchall()
     return [{"word": r["word"], "score": round(r["score"], 2)} for r in rows]
