@@ -12,12 +12,12 @@ from pydantic import BaseModel
 
 from major import (
     build_story, clean_number, connect, decode_word, delete_personal_word,
-    ensure_personal_words, personal_words_for, save_personal_word, segment, words_for,
+    ensure_personal_words, save_personal_word, segment, words_for,
 )
 from quiz import make_question
 
 MAX_DIGITS = 300
-WORD_RE = r"^[A-Za-z'\\-]{1,40}$"
+WORD_RE = r"^[A-Za-z'-]{1,40}$"
 ROOT = Path(__file__).resolve().parent
 STATIC = ROOT / "static"
 FRONTEND_DIST = ROOT / "frontend" / "dist"
