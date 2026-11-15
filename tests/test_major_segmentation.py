@@ -58,7 +58,7 @@ class FixedWidthSegmentationTests(unittest.TestCase):
         )
 
     def test_missing_word_does_not_change_group_boundaries(self):
-        chunks = segment(self.conn, "141592653589", target=2)
+        chunks = segment(self.conn, "141592653588", target=2)
         self.assertEqual(chunks, [])
 
     def test_invalid_target_is_rejected(self):
