@@ -7,6 +7,7 @@ from major import (
     personal_words_for,
     save_personal_word,
     segment,
+    validate_personal_word,
 )
 
 
@@ -33,6 +34,15 @@ class PersonalWordLibraryTests(unittest.TestCase):
     def test_personal_word_is_not_used_for_another_number(self):
         save_personal_word(self.conn, "myword", "141")
         self.assertEqual(personal_words_for(self.conn, "142"), [])
+
+    def test_unknown_word_can_be_saved_as_user_confirmed_mapping(self):
+        self.assertEqual(validate_personal_word("lifebuoy", "589"), (True, "custom"))
+
+    def test_known_word_must_match_dictionary_pronunciation(self):
+        self.assertEqual(validate_personal_word("tarot", "141"), (True, "dictionary"))
+        valid, mapping = validate_personal_word("tarot", "999")
+        self.assertFalse(valid)
+        self.assertEqual(mapping, "141")
 
     def test_delete_personal_word(self):
         save_personal_word(self.conn, "myword", "141")
