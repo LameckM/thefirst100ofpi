@@ -67,7 +67,7 @@ def add_personal_word(req: PersonalWordRequest):
     digits = req.digits.strip()
     if not word or not __import__("re").fullmatch(WORD_RE, word):
         raise HTTPException(400, "Enter a valid word (letters, apostrophes or hyphens only).")
-    if not __import__("re").fullmatch(r"\\d{1,4}", digits):
+    if not __import__("re").fullmatch(r"\d{1,4}", digits):
         raise HTTPException(400, "The number group must contain 1 to 4 digits.")
     options = decode_word(word)
     if options is None:
