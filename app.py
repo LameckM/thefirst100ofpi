@@ -1,7 +1,6 @@
-"""FastAPI backend for the Major System number memorizer.
+"""FastAPI backend for Number Stories.
 
-Run:  uvicorn app:app --reload
-Open: http://127.0.0.1:8000
+Run: uvicorn app:app --reload
 """
 from pathlib import Path
 
@@ -14,9 +13,11 @@ from major import build_story, clean_number, connect, decode_word, segment, word
 from quiz import make_question
 
 MAX_DIGITS = 300
-STATIC = Path(__file__).with_name("static")
+ROOT = Path(__file__).resolve().parent
+STATIC = ROOT / "static"
+FRONTEND_DIST = ROOT / "frontend" / "dist"
 
-app = FastAPI(title="Major System Memorizer")
+app = FastAPI(title="Number Stories")
 conn = connect()
 
 
@@ -37,12 +38,8 @@ def encode(number: str = Query(..., min_length=1), target: int = Query(3, ge=1, 
     if not chunks:
         raise HTTPException(422, "Could not find words for that number.")
     story = build_story([c["word"] for c in chunks], [c["digits"] for c in chunks])
-    return {
-        "digits": digits,
-        "grouped": "-".join(c["digits"] for c in chunks),
-        "chunks": chunks,
-        "story": story,
-    }
+    return {"digits": digits, "grouped": "-".join(c["digits"] for c in chunks),
+            "chunks": chunks, "story": story}
 
 
 @app.get("/api/words")
@@ -55,6 +52,8 @@ def story(req: StoryRequest):
     words = [w.strip().lower() for w in req.words if w.strip()]
     if not words or len(words) > 120:
         raise HTTPException(400, "Send between 1 and 120 words.")
+    if req.digits is not None and len(req.digits) != len(words):
+        raise HTTPException(400, "The digits list must contain one entry per word.")
     return {"story": build_story(words, req.digits, req.variant)}
 
 
@@ -63,7 +62,6 @@ WORD_RE = r"^[A-Za-z'\-]{1,40}$"
 
 @app.get("/api/decode")
 def decode(word: str = Query(..., pattern=WORD_RE)):
-    """Turn any English word into its Major System number, sound by sound."""
     w = word.strip().lower()
     opts = decode_word(w)
     return {"word": w, "found": opts is not None, "options": opts or []}
@@ -71,7 +69,6 @@ def decode(word: str = Query(..., pattern=WORD_RE)):
 
 @app.get("/api/check-word")
 def check_word(word: str = Query(..., pattern=WORD_RE), digits: str = Query(..., pattern=r"^\d{1,4}$")):
-    """Does this word stand for these digits? Used by the practice test."""
     w = word.strip().lower()
     opts = decode_word(w)
     if opts is None:
@@ -92,7 +89,14 @@ def quiz(
 
 @app.get("/")
 def index():
+    # Prefer the compiled React app once frontend/dist exists. Keep the old
+    # static page as a no-build fallback so the API remains usable during setup.
+    react_index = FRONTEND_DIST / "index.html"
+    if react_index.is_file():
+        return FileResponse(react_index)
     return FileResponse(STATIC / "index.html")
 
 
+if FRONTEND_DIST.is_dir():
+    app.mount("/assets", StaticFiles(directory=FRONTEND_DIST / "assets"), name="assets")
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
