@@ -33,6 +33,10 @@ export default function App() {
  const [picked,setPicked]=useState("");
  const [own,setOwn]=useState("");
  const [ownMessage,setOwnMessage]=useState("");
+ const [customWords,setCustomWords]=useState({});
+ const [customMessages,setCustomMessages]=useState({});
+ const [library,setLibrary]=useState([]);
+ const [libraryOpen,setLibraryOpen]=useState(false);
 
  function go(next) {
   setView(next); history.replaceState(null,"",location.pathname+location.search+"#"+next);
@@ -76,6 +80,29 @@ export default function App() {
   setRound(v=>({...v,score:v.score+(ok?1:0),missed:ok?v.missed:[...v.missed,{prompt:question.prompt,answer:question.answer,explanation:question.explanation}]}));
   setFeedback({ok});
  }
+ async function saveCustomWord(e, digits) {
+  e.preventDefault();
+  const value=(customWords[digits]||"").trim();
+  if(!value){setCustomMessages(v=>({...v,[digits]:"Enter a word first."}));return;}
+  try {
+   await api("/api/personal-words",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({word:value,digits})});
+   setCustomMessages(v=>({...v,[digits]:"Saved to your Personal Word Library."}));
+   const updated=await api("/api/encode?number="+encodeURIComponent(number)+"&target="+target);
+   setResult(updated);
+   if(libraryOpen)loadLibrary();
+  } catch(e){setCustomMessages(v=>({...v,[digits]:e.message}));}
+ }
+ async function loadLibrary() {
+  try {const r=await api("/api/personal-words");setLibrary(r.words);setLibraryOpen(true);}
+  catch(e){setError(e.message);}
+ }
+ async function removeLibraryWord(word,digits) {
+  try {
+   await api("/api/personal-words?word="+encodeURIComponent(word)+"&digits="+digits,{method:"DELETE"});
+   await loadLibrary();
+   if(number)create();
+  } catch(e){setError(e.message);}
+ }
  async function checkOwn(e) {
   e.preventDefault();
   try {
@@ -100,10 +127,11 @@ export default function App() {
     <div className="hero"><span className="eyebrow">YOUR MEMORY STUDIO</span><h1>Make a number <em>stick.</em></h1><p>Turn digits into vivid images, then connect those images into a story your mind can replay.</p></div>
     <div className="input-panel"><div className="panel-label"><span>01 / NUMBER INPUT</span><span>UP TO 300 DIGITS</span></div><form onSubmit={e=>{e.preventDefault();create();}}><label htmlFor="number">What do you want to remember?</label><div className="input-row"><input id="number" value={number} onChange={e=>setNumber(e.target.value)} inputMode="numeric" placeholder="Try 314159265358979..."/><Button disabled={busy}>{busy?"Building...":"Create story ↗"}</Button></div></form><div className="target-row"><span>Words should represent</span>{[2,3,4].map(n=><button key={n} className={target===n?"chosen":""} onClick={()=>{setTarget(n);if(result)create(n);}}>{n} digits</button>)}</div></div>
     {result&&<section className="results"><div className="result-head"><div><span className="eyebrow">02 / YOUR MEMORY MAP</span><h2>{result.chunks.length} images for your number</h2><p className="digits">{result.grouped}</p></div><Button kind="quiet" onClick={async()=>{try{const r=await story(result.chunks.map(c=>c.word),result.chunks.map(c=>c.digits),Date.now());setResult(v=>({...v,story:r.story}));}catch(e){setError(e.message);}}}>↻ Another story</Button></div>
-     <div className="word-grid">{result.chunks.map((c,i)=><article className="word-card" key={i}><div className="word-meta"><span>SCENE {String(i+1).padStart(2,"0")}</span><span>{c.digits}</span></div><h3>{c.word || "Choose a word"}</h3>{!c.word&&<small className="hint">No dictionary match for this group yet</small>}<div className="alternatives"><small>SWAP IMAGE</small>{(c.alternatives||[]).filter(w=>w!==c.word).slice(0,c.expanded?40:4).map(w=><button key={w} onClick={()=>swap(i,w)}>{w}</button>)}{c.word&&!c.expanded&&<button className="more" onClick={()=>more(i)}>More +</button>}{!c.word&&<small>Word not assigned</small>}</div></article>)}</div>
+     <div className="word-grid">{result.chunks.map((c,i)=><article className="word-card" key={i}><div className="word-meta"><span>SCENE {String(i+1).padStart(2,"0")}</span><span>{c.digits}</span></div><h3>{c.word || "Choose a word"}</h3>{!c.word&&<small className="hint">No dictionary match for this group yet</small>}<div className="alternatives"><small>SWAP IMAGE</small>{(c.alternatives||[]).filter(w=>w!==c.word).slice(0,c.expanded?40:4).map(w=><button key={w} onClick={()=>swap(i,w)}>{w}</button>)}{c.word&&!c.expanded&&<button className="more" onClick={()=>more(i)}>More +</button>}{!c.word&&<small>Word not assigned</small>}</div><form className="personal-word-form" onSubmit={e=>saveCustomWord(e,c.digits)}><label htmlFor={"custom-"+i}>Add your own word for {c.digits}</label><div className="input-row"><input id={"custom-"+i} value={customWords[c.digits]||""} onChange={e=>setCustomWords(v=>({...v,[c.digits]:e.target.value}))} placeholder="Type a word..."/><Button kind="secondary">Save word</Button></div>{customMessages[c.digits]&&<small className="personal-message">{customMessages[c.digits]}</small>}</form></article>)}</div>
      <div className="story-panel"><div className="result-head"><div><span className="eyebrow">03 / CONNECT THE SCENES</span><h2>Your story</h2></div><Button kind="secondary" onClick={()=>navigator.clipboard.writeText(result.grouped+"\n\n"+result.chunks.map(c=>c.digits+" = "+c.word).join("\n")+"\n\n"+result.story.map(s=>s.replace(/\[\[([^\]|]+)\|?[^\]]*\]\]/g,"$1")).join(" "))}>Copy story</Button></div>{result.story.map((s,i)=><p className="story-line" key={i}>{s.split(/(\[\[[^\]]+\]\])/g).map((part,j)=>part.startsWith("[[")?<mark key={j}>{part.match(/\[\[([^\]|]+)/)?.[1]}</mark>:part)}</p>)}<small className="hint">Make each scene unusual, oversized and full of movement. The stranger it feels, the easier it is to recall.</small></div>
     </section>}
     {!result&&<div className="starter"><h2>From abstract digits to unforgettable scenes.</h2><p><b>01 Encode</b> — digits become consonant sounds and words.</p><p><b>02 Visualise</b> — choose images that feel clear and personal.</p><p><b>03 Connect</b> — link each image into one memorable story.</p></div>}
+    <div className="input-panel personal-library"><div className="result-head"><div><span className="eyebrow">YOUR CUSTOM VOCABULARY</span><h2>Personal Word Library</h2><p>Words you save are preferred whenever the same number group appears again.</p></div><Button kind="secondary" onClick={loadLibrary}>{libraryOpen?"Refresh library":"View saved words"}</Button></div>{libraryOpen&&<div className="library-list">{library.length?library.map((item,i)=><div className="library-item" key={item.word+"-"+item.digits}><span><b>{item.word}</b><small>{item.digits}</small></span><button onClick={()=>removeLibraryWord(item.word,item.digits)}>Remove</button></div>):<p className="hint">No personal words saved yet. Add one to a number group above.</p>}</div>}</div>
     <div className="callout"><span>NEW TO THIS TECHNIQUE?</span><p>Learn the simple sound code behind every number.</p><Button kind="secondary" onClick={()=>go("learn")}>Explore the method ↗</Button></div>
    </section>}
    {view==="learn"&&<section><div className="hero"><span className="eyebrow">THE METHOD</span><h1>Learn the <em>Major System.</em></h1><p>A sound-based code that turns hard-to-recall numbers into words, pictures and stories.</p></div><div className="lesson"><span className="eyebrow">01 / THE BIG IDEA</span><h2>Your brain remembers pictures better than digits.</h2><p>Each digit maps to a consonant sound. Add vowels to make a word, turn that word into a mental image, and connect images in sequence.</p></div><div className="input-panel"><span className="eyebrow">02 / THE SOUND CODE</span><h2>Ten digits. Ten sound groups.</h2><div className="digit-grid">{MAP.map(([d,s,h,w])=><article key={d}><b>{d}</b><div><strong>{s}</strong><p>{h}</p><small>EXAMPLE · {w}</small></div></article>)}</div></div><div className="lesson"><span className="eyebrow">03 / FOUR RULES</span><h2>Sound matters. Spelling doesn't.</h2><ul><li><b>Ignore vowels, H, W and Y.</b> They help form words but carry no digits.</li><li><b>Listen for consonant sounds.</b> Phone begins with an F sound, so it maps to 8.</li><li><b>One sound, one digit.</b> A double letter making one sound counts once.</li><li><b>Letters can change sound.</b> Soft C sounds like S; hard C sounds like K.</li></ul></div><div className="input-panel"><span className="eyebrow">04 / TRY IT YOURSELF</span><h2>Decode any word.</h2><form className="input-row" onSubmit={e=>{e.preventDefault();decode();}}><input value={word} onChange={e=>setWord(e.target.value)} placeholder="Try phone..." aria-label="Word to decode"/><Button>Decode word</Button></form>{decoded&&(!decoded.found?<p>Word not found. Try another.</p>:decoded.options.map((o,i)=><p key={i} className="decode-line">{o.steps.map(s=>s.sound+" = "+s.digit).join(" · ")} <b>→ {o.digits||"no digits"}</b></p>))}</div><Button onClick={()=>go("practice")}>I'm ready to practise ↗</Button></section>}
