@@ -3,6 +3,7 @@
 Run: uvicorn app:app --reload
 """
 from pathlib import Path
+import re
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse
@@ -16,6 +17,7 @@ from major import (
 from quiz import make_question
 
 MAX_DIGITS = 300
+WORD_RE = r"^[A-Za-z'\\-]{1,40}$"
 ROOT = Path(__file__).resolve().parent
 STATIC = ROOT / "static"
 FRONTEND_DIST = ROOT / "frontend" / "dist"
@@ -65,7 +67,7 @@ def list_personal_words():
 def add_personal_word(req: PersonalWordRequest):
     word = req.word.strip().lower()
     digits = req.digits.strip()
-    if not word or not __import__("re").fullmatch(WORD_RE, word):
+    if not word or not re.fullmatch(WORD_RE, word):
         raise HTTPException(400, "Enter a valid word (letters, apostrophes or hyphens only).")
     if not __import__("re").fullmatch(r"\d{1,4}", digits):
         raise HTTPException(400, "The number group must contain 1 to 4 digits.")
