@@ -80,6 +80,23 @@ def decode_word(word):
     return out
 
 
+def validate_personal_word(word, digits):
+    """Validate a saved mapping without rejecting words absent from CMU.
+
+    Known words must match at least one recorded pronunciation. Unknown words
+    may be saved as user-confirmed mappings; spelling alone is not treated as
+    proof of pronunciation.
+    """
+    options = decode_word(word)
+    if options is None:
+        return True, "custom"
+    if any(option["digits"] == digits for option in options):
+        return True, "dictionary"
+    mappings = sorted({option["digits"] for option in options if option["digits"]})
+    shown = ", ".join(mappings) if mappings else "no digits"
+    return False, shown
+
+
 def explain(word):
     """'tarot: t=1 · r=4 · t=1 -> 141'"""
     opts = decode_word(word)
