@@ -18,6 +18,7 @@ function Button({children,kind="primary",...props}) { return <button className={
 
 export default function App() {
  const [view,setView]=useState(location.hash.slice(1)||"create");
+ const [theme,setTheme]=useState(()=>localStorage.getItem("number-stories-theme")||"light");
  const [number,setNumber]=useState(new URLSearchParams(location.search).get("n")||"");
  const [target,setTarget]=useState(3);
  const [result,setResult]=useState(null);
@@ -114,12 +115,16 @@ export default function App() {
  }
  const finished=round&&round.n===round.total&&feedback;
  useEffect(()=>{if(number)create();},[]);
+ useEffect(()=>{
+  document.documentElement.dataset.theme=theme;
+  localStorage.setItem("number-stories-theme",theme);
+ },[theme]);
 
  return <div className="shell">
   <header className="topbar">
    <button className="brand" onClick={()=>go("create")}><span className="brand-icon">N<span>.</span></span><span>number stories<small>MAKE NUMBERS MEMORABLE</small></span></button>
    <nav>{["create","learn","practice"].map(v=><button key={v} className={view===v?"active":""} onClick={()=>go(v)}>{v[0].toUpperCase()+v.slice(1)}</button>)}</nav>
-   <span className="top-note">THE MAJOR SYSTEM <i/></span>
+   <div className="header-actions"><button className="theme-toggle" onClick={()=>setTheme(v=>v==="light"?"dark":"light")} aria-label={"Switch to "+(theme==="light"?"dark":"light")+" mode"} title={"Switch to "+(theme==="light"?"dark":"light")+" mode"}><span aria-hidden="true">{theme==="light"?"☾":"☀"}</span><span>{theme==="light"?"Dark mode":"Light mode"}</span></button><span className="top-note">THE MAJOR SYSTEM <i/></span></div>
   </header>
   <main>
    {error&&<div className="alert" role="alert">{error}<button onClick={()=>setError("")}>Dismiss</button></div>}
