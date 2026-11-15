@@ -107,6 +107,44 @@ def words_for(conn, digits, limit=12):
     return [{"word": r["word"], "score": round(r["score"], 2)} for r in rows]
 
 
+def ensure_personal_words(conn):
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS personal_words ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+        "word TEXT NOT NULL, digits TEXT NOT NULL, "
+        "created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, "
+        "UNIQUE(word, digits))"
+    )
+    conn.commit()
+
+
+def personal_words_for(conn, digits, limit=40):
+    ensure_personal_words(conn)
+    rows = conn.execute(
+        "SELECT word FROM personal_words WHERE digits = ? "
+        "ORDER BY created_at DESC, word LIMIT ?", (digits, limit)
+    ).fetchall()
+    return [r["word"] for r in rows]
+
+
+def save_personal_word(conn, word, digits):
+    ensure_personal_words(conn)
+    conn.execute(
+        "INSERT OR IGNORE INTO personal_words (word, digits) VALUES (?, ?)",
+        (word, digits),
+    )
+    conn.commit()
+
+
+def delete_personal_word(conn, word, digits):
+    ensure_personal_words(conn)
+    conn.execute(
+        "DELETE FROM personal_words WHERE word = ? AND digits = ?",
+        (word, digits),
+    )
+    conn.commit()
+
+
 def clean_number(raw):
     return re.sub(r"\D", "", raw or "")
 
@@ -126,7 +164,14 @@ def segment(conn, digits, target=3, max_len=4, alt_count=12):
     used = set()
     for i in range(0, len(digits), target):
         chunk_digits = digits[i:i + target]
-        candidates = words_for(conn, chunk_digits, alt_count)
+        personal = [
+            {"word": word, "score": 10_000.0}
+            for word in personal_words_for(conn, chunk_digits, alt_count)
+        ]
+        candidates = personal + [
+            item for item in words_for(conn, chunk_digits, alt_count)
+            if item["word"] not in {saved["word"] for saved in personal}
+        ]
         pick = next((item for item in candidates if item["word"] not in used), candidates[0] if candidates else None)
         if pick:
             used.add(pick["word"])
