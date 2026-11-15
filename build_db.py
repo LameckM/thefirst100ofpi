@@ -89,9 +89,10 @@ def main():
     wn = WordNet()
     pron = cmudict.dict()
 
-    if DB_PATH.exists():
-        DB_PATH.unlink()
+    # Rebuild only the generated dictionary. Keep the personal_words table
+    # in the same SQLite file so a vocabulary refresh never deletes user data.
     conn = sqlite3.connect(DB_PATH)
+    conn.execute("DROP TABLE IF EXISTS words")
     conn.execute(
         "CREATE TABLE words (word TEXT, digits TEXT, score REAL, zipf REAL, kind INTEGER,"
         " known INTEGER, proper INTEGER)"
