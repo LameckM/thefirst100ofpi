@@ -41,7 +41,7 @@ export default function App() {
  async function create(targetValue=target) {
   if(!number.trim()){setError("Enter a number first.");return;}
   setBusy(true);setError("");
-  try { setResult(await api("/api/encode?number="+encodeURIComponent(number)+"&target="+target)); }
+  try { setResult(await api("/api/encode?number="+encodeURIComponent(number)+"&target="+targetValue)); }
   catch(e){setError(e.message);} finally{setBusy(false);}
  }
  async function story(words,digits,variant) {
