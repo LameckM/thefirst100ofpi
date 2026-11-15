@@ -12,7 +12,7 @@ from pydantic import BaseModel
 
 from major import (
     build_story, clean_number, connect, decode_word, delete_personal_word,
-    ensure_personal_words, save_personal_word, segment, words_for,
+    ensure_personal_words, save_personal_word, segment, validate_personal_word, words_for,
 )
 from quiz import make_question
 
@@ -71,15 +71,21 @@ def add_personal_word(req: PersonalWordRequest):
         raise HTTPException(400, "Enter a valid word (letters, apostrophes or hyphens only).")
     if not re.fullmatch(r"\d{1,4}", digits):
         raise HTTPException(400, "The number group must contain 1 to 4 digits.")
-    options = decode_word(word)
-    if options is None:
-        raise HTTPException(422, "We cannot validate that word yet. Try a word in the pronunciation dictionary.")
-    if not any(option["digits"] == digits for option in options):
-        mappings = sorted({option["digits"] for option in options if option["digits"]})
-        shown = ", ".join(mappings) if mappings else "no digits"
-        raise HTTPException(422, f"'{word}' maps to {shown}, not {digits}.")
+    valid, validation = validate_personal_word(word, digits)
+    if not valid:
+        raise HTTPException(422, f"'{word}' maps to {validation}, not {digits}.")
     save_personal_word(conn, word, digits)
-    return {"saved": True, "word": word, "digits": digits}
+    return {
+        "saved": True,
+        "word": word,
+        "digits": digits,
+        "verification": "dictionary" if validation == "dictionary" else "user-confirmed",
+        "message": (
+            "Pronunciation matched the dictionary."
+            if validation == "dictionary"
+            else "Custom mapping saved. Make sure the spoken consonant sounds match this number."
+        ),
+    }
 
 
 @app.delete("/api/personal-words")
