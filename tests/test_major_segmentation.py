@@ -22,7 +22,7 @@ class FixedWidthSegmentationTests(unittest.TestCase):
                 ("tire", "14", 7.0), ("tile", "15", 7.0),
                 ("panel", "925", 7.0),
                 ("turtle", "1415", 7.0), ("punchily", "9265", 7.0),
-                ("mollifob", "3589", 7.0),\n                ("one", "12", 7.0), ("more", "34", 7.0), ("law", "5", 7.0),
+                ("mollifob", "3589", 7.0),\n                ("tin", "12", 7.0), ("more", "34", 7.0), ("law", "5", 7.0),
             ],
         )
 
