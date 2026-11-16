@@ -29,6 +29,43 @@ function Progress({scores,onClear}) {
   <button className="link-btn" onClick={()=>{if(confirm("Clear all saved scores?"))onClear();}}>Clear scores</button>
  </div>;
 }
+const PALACE_KEY="number-stories-palace";
+const EXAMPLE_STOPS=["front gate","front door","shoe rack","sofa","tv","dining table","fridge","kitchen sink","bedroom door","bed","wardrobe","bathroom mirror"];
+function loadStops(){try{const v=JSON.parse(localStorage.getItem(PALACE_KEY)||"[]");return Array.isArray(v)?v.filter(x=>typeof x==="string"):[];}catch{return [];}}
+function article(w){return /^(a|e|i|o)/i.test(w)||/^u(?!ni|se|su|ro|ten)/i.test(w)?"an":"a";}
+function Palace({chunks}) {
+ const [stops,setStops]=useState(loadStops);
+ const [text,setText]=useState("");
+ function commit(next){setStops(next);try{localStorage.setItem(PALACE_KEY,JSON.stringify(next));}catch{}}
+ function add(e){
+  e.preventDefault();
+  addParts(text);
+  setText("");
+ }
+ function addParts(raw){
+  const parts=raw.split(/[,\n]/).map(x=>x.trim()).filter(Boolean);
+  if(parts.length)commit([...stops,...parts].slice(0,120));
+ }
+ function paste(e){
+  const t=e.clipboardData.getData("text");
+  if(/[\n,]/.test(t)){e.preventDefault();addParts(text+t);setText("");}
+ }
+ function move(i,d){const j=i+d;if(j<0||j>=stops.length)return;const n=[...stops];[n[i],n[j]]=[n[j],n[i]];commit(n);}
+ const missing=Math.max(0,chunks.length-stops.length);
+ return <div className="input-panel palace">
+  <div className="result-head"><div><span className="eyebrow">Walk your route</span><h2>Memory palace</h2><p>List the places you pass in order. Each image from your number goes on the next place.</p></div>
+   {stops.length>0&&<Button kind="quiet" onClick={()=>{if(confirm("Remove all stops?"))commit([]);}}>Clear stops</Button>}</div>
+  <form className="input-row" onSubmit={add}><input aria-label="Add stops" value={text} onChange={e=>setText(e.target.value)} onPaste={paste} placeholder="gate, door, sofa..."/><Button kind="secondary">Add stop</Button></form>
+  <small className="hint">Type one place, or paste several separated by commas. Use places you can picture without effort.</small>
+  {!stops.length&&<div className="palace-empty"><Button kind="quiet" onClick={()=>commit(EXAMPLE_STOPS)}>Use example stops</Button></div>}
+  {stops.length>0&&<ol className="route">{stops.map((st,i)=>{const c=chunks[i];return <li key={i+st}>
+   <span className="stop-n">{i+1}</span>
+   <div className="stop-body"><b>{st}</b>{c&&(c.word?<p>Picture {article(c.word)} <mark>{c.word}</mark> at the {st}. <span className="stop-digits">{c.digits}</span></p>:<p className="hint">No word for {c.digits} yet. Add one above.</p>)}</div>
+   <div className="stop-actions"><button aria-label={"Move "+st+" up"} disabled={i===0} onClick={()=>move(i,-1)}>↑</button><button aria-label={"Move "+st+" down"} disabled={i===stops.length-1} onClick={()=>move(i,1)}>↓</button><button className="rm" aria-label={"Remove "+st} onClick={()=>commit(stops.filter((_,n)=>n!==i))}>✕</button></div>
+  </li>;})}</ol>}
+  {chunks.length>0&&(missing>0?<p className="palace-warn">Your number has {chunks.length} images but you have {stops.length} stops. Add {missing} more to place them all.</p>:stops.length>0&&<p className="palace-ok">Every image has a place. Walk the route a few times, seeing each scene.</p>)}
+ </div>;
+}
 function Button({children,kind="primary",...props}) { return <button className={"button "+kind} {...props}>{children}</button>; }
 
 export default function App() {
@@ -158,6 +195,7 @@ export default function App() {
      <div className="story-panel"><div className="result-head"><div><span className="eyebrow">03 / CONNECT THE SCENES</span><h2>Your story</h2></div><Button kind="secondary" onClick={()=>navigator.clipboard.writeText(result.grouped+"\n\n"+result.chunks.map(c=>c.digits+" = "+c.word).join("\n")+"\n\n"+result.story.map(s=>s.replace(/\[\[([^\]|]+)\|?[^\]]*\]\]/g,"$1")).join(" "))}>Copy story</Button></div>{result.story.map((s,i)=><p className="story-line" key={i}>{s.split(/(\[\[[^\]]+\]\])/g).map((part,j)=>part.startsWith("[[")?<mark key={j}>{part.match(/\[\[([^\]|]+)/)?.[1]}</mark>:part)}</p>)}<small className="hint">Make each scene unusual, oversized and full of movement. The stranger it feels, the easier it is to recall.</small></div>
     </section>}
     {!result&&<div className="starter"><h2>From abstract digits to unforgettable scenes.</h2><p><b>01 Encode</b> — digits become consonant sounds and words.</p><p><b>02 Visualise</b> — choose images that feel clear and personal.</p><p><b>03 Connect</b> — link each image into one memorable story.</p></div>}
+    <Palace chunks={result?result.chunks:[]}/>
     <div className="input-panel personal-library"><div className="result-head"><div><span className="eyebrow">YOUR CUSTOM VOCABULARY</span><h2>Personal Word Library</h2><p>Words you save are preferred whenever the same number group appears again.</p></div><Button kind="secondary" onClick={loadLibrary}>{libraryOpen?"Refresh library":"View saved words"}</Button></div>{libraryOpen&&<div className="library-list">{library.length?library.map((item,i)=><div className="library-item" key={item.word+"-"+item.digits}><span><b>{item.word}</b><small>{item.digits}</small></span><button onClick={()=>removeLibraryWord(item.word,item.digits)}>Remove</button></div>):<p className="hint">No personal words saved yet. Add one to a number group above.</p>}</div>}</div>
     <div className="callout"><span>NEW TO THIS TECHNIQUE?</span><p>Learn the simple sound code behind every number.</p><Button kind="secondary" onClick={()=>go("learn")}>Explore the method ↗</Button></div>
    </section>}

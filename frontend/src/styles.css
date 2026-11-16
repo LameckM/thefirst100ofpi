@@ -185,6 +185,24 @@ mark{background:var(--hl);background-size:100% 1.2em;background-position:center;
 .trend em{position:absolute;left:0;right:0;bottom:-22px;text-align:center;font:600 13px var(--sans);font-style:normal;color:var(--soft)}
 .link-btn{margin-top:16px;min-height:44px;border:0;background:none;color:var(--no);font-weight:700;text-decoration:underline;padding:0}
 .new-best{display:inline;background:var(--hl);background-size:100% 1.15em;background-position:0 62%;color:var(--marker-text);font-weight:700;padding:0 .3em}
+.palace .result-head p{color:var(--soft);margin:4px 0 14px;font-size:15px}
+.palace-empty{margin-top:8px}
+.route{list-style:none;margin:18px 0 0;padding:0;border-top:2px dotted var(--line)}
+.route li{display:flex;align-items:flex-start;gap:14px;padding:12px 0;border-bottom:2px dotted var(--line)}
+.stop-n{flex:0 0 34px;font:400 26px var(--serif);font-variant-numeric:lining-nums;color:var(--biro);text-align:center;line-height:1.2}
+.stop-body{flex:1;min-width:0}
+.stop-body b{font-size:18px}
+.stop-body p{margin:4px 0 0;font:400 17px/1.6 var(--serif)}
+.stop-body p.hint{font:400 14px var(--sans);margin-top:4px}
+.stop-digits{font:400 15px var(--serif);font-variant-numeric:lining-nums;color:var(--biro);margin-left:6px}
+.stop-actions{display:flex;gap:2px}
+.stop-actions button{width:44px;height:44px;border:0;background:none;font-size:18px;border-radius:8px;color:var(--soft)}
+.stop-actions button:hover:not(:disabled){background:var(--line);color:var(--ink)}
+.stop-actions button:disabled{opacity:.3;cursor:default}
+.stop-actions .rm{color:var(--no)}
+.palace-warn{color:var(--no);font-weight:600;margin:16px 0 0}
+.palace-ok{color:var(--go);font-weight:600;margin:16px 0 0}
+@media(max-width:720px){.route li{flex-wrap:wrap}.stop-body{flex:1 1 calc(100% - 52px)}.stop-actions{flex:0 0 100%;margin-left:48px}.palace .result-head .button{padding-left:0}}
 footer{display:flex;align-items:center;gap:12px;padding:22px max(5vw,20px);border-top:2px solid var(--ink);color:var(--soft);font-size:14px}
 footer b{color:var(--ink);font-weight:700}
 footer>span:last-child{margin-left:auto}
