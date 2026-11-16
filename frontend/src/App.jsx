@@ -18,7 +18,7 @@ function Button({children,kind="primary",...props}) { return <button className={
 
 export default function App() {
  const [view,setView]=useState(location.hash.slice(1)||"create");
- const [theme,setTheme]=useState(()=>localStorage.getItem("number-stories-theme")||"light");
+ const [theme,setTheme]=useState(()=>localStorage.getItem("number-stories-theme")||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"));
  const [number,setNumber]=useState(new URLSearchParams(location.search).get("n")||"");
  const [target,setTarget]=useState(3);
  const [result,setResult]=useState(null);
