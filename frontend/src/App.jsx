@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const API = import.meta.env.VITE_API_BASE_URL || "";
 const MAP = [
@@ -13,6 +13,21 @@ async function api(path, options) {
  const data = await response.json().catch(() => ({}));
  if (!response.ok) throw new Error(typeof data.detail === "string" ? data.detail : "Request failed.");
  return data;
+}
+const SCORE_KEY="number-stories-scores";
+const KIND_LABEL={mix:"Everything",sounds:"Digit to sounds",digit:"Sound to digit",word:"Word to number",number:"Number to word"};
+function loadScores(){try{const v=JSON.parse(localStorage.getItem(SCORE_KEY)||"[]");return Array.isArray(v)?v:[];}catch{return [];}}
+function saveScores(list){try{localStorage.setItem(SCORE_KEY,JSON.stringify(list));}catch{}}
+function Progress({scores,onClear}) {
+ if(!scores.length)return <p className="hint">Your scores will show up here after your first round.</p>;
+ const best=Math.max(...scores.map(s=>s.score));
+ const avg=(scores.reduce((a,s)=>a+s.score,0)/scores.length).toFixed(1);
+ const recent=scores.slice(-10);
+ return <div className="progress-card">
+  <div className="stat-row"><div><b>{scores.length}</b><small>rounds played</small></div><div><b>{best}/10</b><small>best score</small></div><div><b>{avg}</b><small>average</small></div></div>
+  <div className="trend" role="img" aria-label={"Last "+recent.length+" scores: "+recent.map(s=>s.score).join(", ")}>{recent.map((s,i)=><span key={i} title={s.score+"/10 · "+(KIND_LABEL[s.kind]||s.kind)+" · "+s.level+" · "+new Date(s.at).toLocaleDateString()}><i style={{height:(s.score*10)+"%"}}/><em>{s.score}</em></span>)}</div>
+  <button className="link-btn" onClick={()=>{if(confirm("Clear all saved scores?"))onClear();}}>Clear scores</button>
+ </div>;
 }
 function Button({children,kind="primary",...props}) { return <button className={"button "+kind} {...props}>{children}</button>; }
 
@@ -38,6 +53,8 @@ export default function App() {
  const [customMessages,setCustomMessages]=useState({});
  const [library,setLibrary]=useState([]);
  const [libraryOpen,setLibraryOpen]=useState(false);
+ const [scores,setScores]=useState(loadScores);
+ const savedRound=useRef(null);
 
  function go(next) {
   setView(next); history.replaceState(null,"",location.pathname+location.search+"#"+next);
@@ -71,7 +88,7 @@ export default function App() {
   try {
    const q=await api("/api/quiz?kind="+kind+"&level="+level);
    setQuestion(q);
-   setRound(v=>fresh?{n:1,score:0,missed:[],total:10}:{...v,n:v.n+1});
+   setRound(v=>fresh?{id:Date.now(),n:1,score:0,missed:[],total:10}:{...v,n:v.n+1});
   } catch(e){setError(e.message);}
  }
  function start(){setRound({n:0,score:0,missed:[],total:10});setQuestion(null);loadQuestion(true);}
@@ -114,6 +131,11 @@ export default function App() {
   } catch(e){setOwnMessage(e.message);}
  }
  const finished=round&&round.n===round.total&&feedback;
+ useEffect(()=>{
+  if(!finished||savedRound.current===round.id)return;
+  savedRound.current=round.id;
+  setScores(v=>{const next=[...v,{at:Date.now(),score:round.score,kind,level}].slice(-100);saveScores(next);return next;});
+ },[finished]);
  useEffect(()=>{if(number)create();},[]);
  useEffect(()=>{
   document.documentElement.dataset.theme=theme;
@@ -141,8 +163,9 @@ export default function App() {
    </section>}
    {view==="learn"&&<section><div className="hero"><span className="eyebrow">THE METHOD</span><h1>Learn the <em>Major System.</em></h1><p>A sound-based code that turns hard-to-recall numbers into words, pictures and stories.</p></div><div className="lesson"><span className="eyebrow">01 / THE BIG IDEA</span><h2>Your brain remembers pictures better than digits.</h2><p>Each digit maps to a consonant sound. Add vowels to make a word, turn that word into a mental image, and connect images in sequence.</p></div><div className="input-panel"><span className="eyebrow">02 / THE SOUND CODE</span><h2>Ten digits. Ten sound groups.</h2><div className="digit-grid">{MAP.map(([d,s,h,w])=><article key={d}><b>{d}</b><div><strong>{s}</strong><p>{h}</p><small>EXAMPLE · {w}</small></div></article>)}</div></div><div className="lesson"><span className="eyebrow">03 / FOUR RULES</span><h2>Sound matters. Spelling doesn't.</h2><ul><li><b>Ignore vowels, H, W and Y.</b> They help form words but carry no digits.</li><li><b>Listen for consonant sounds.</b> Phone begins with an F sound, so it maps to 8.</li><li><b>One sound, one digit.</b> A double letter making one sound counts once.</li><li><b>Letters can change sound.</b> Soft C sounds like S; hard C sounds like K.</li></ul></div><div className="input-panel"><span className="eyebrow">04 / TRY IT YOURSELF</span><h2>Decode any word.</h2><form className="input-row" onSubmit={e=>{e.preventDefault();decode();}}><input value={word} onChange={e=>setWord(e.target.value)} placeholder="Try phone..." aria-label="Word to decode"/><Button>Decode word</Button></form>{decoded&&(!decoded.found?<p>Word not found. Try another.</p>:decoded.options.map((o,i)=><p key={i} className="decode-line">{o.steps.map(s=>s.sound+" = "+s.digit).join(" · ")} <b>→ {o.digits||"no digits"}</b></p>))}</div><Button onClick={()=>go("practice")}>I'm ready to practise ↗</Button></section>}
    {view==="practice"&&<section><div className="hero"><span className="eyebrow">BUILD RECALL</span><h1>Train your <em>memory.</em></h1><p>Short, focused rounds help you learn the sound code until it becomes automatic.</p></div>{!round&&<div className="input-panel"><h2>Set up a practice round</h2><label>Question type</label><div className="target-row wrap">{[["mix","Everything"],["sounds","Digit to sounds"],["digit","Sound to digit"],["word","Word to number"],["number","Number to word"]].map(([v,l])=><button key={v} className={kind===v?"chosen":""} onClick={()=>setKind(v)}>{l}</button>)}</div><label>Difficulty</label><div className="target-row"><button className={level==="easy"?"chosen":""} onClick={()=>setLevel("easy")}>Easy</button><button className={level==="medium"?"chosen":""} onClick={()=>setLevel("medium")}>Medium</button></div><p className="hint">Easy uses 1–2 digit numbers. Medium uses 3-digit numbers and trickier spellings.</p><Button onClick={start}>Start 10-question round ↗</Button></div>}
+    {!round&&<div className="input-panel"><h2>Your progress</h2><Progress scores={scores} onClear={()=>{setScores([]);saveScores([]);}}/></div>}
     {round&&!finished&&question&&<div className="quiz-panel"><div className="panel-label"><span>QUESTION {round.n} / 10</span><b>{round.score} CORRECT</b></div><div className="progress"><span style={{width:(round.n*10)+"%"}}/></div><h2>{question.prompt}</h2>{question.type==="choice"&&<div className="answer-grid">{question.options.map(o=><button key={o} disabled={!!feedback} className={feedback&&o===question.answer?"right":feedback&&o===picked?"wrong":""} onClick={()=>answer(o===question.answer,o)}>{o}</button>)}</div>}{question.type==="digit-grid"&&<div className="answer-grid digits">{Array.from("0123456789").map(d=><button key={d} disabled={!!feedback} onClick={()=>answer(d===question.answer,d)}>{d}</button>)}</div>}{question.type==="number-input"&&<form className="input-row" onSubmit={e=>{e.preventDefault();answer(question.accepted.includes(picked),picked);}}><input inputMode="numeric" placeholder="Enter digits" value={picked} onChange={e=>setPicked(e.target.value.replace(/\D/g,""))} disabled={!!feedback}/><Button disabled={!!feedback}>Check</Button></form>}{question.own_word&&<form className="own-form" onSubmit={checkOwn}><label>Or create your own word for {question.digits}</label><div className="input-row"><input value={own} onChange={e=>setOwn(e.target.value)} placeholder="Your word" disabled={!!feedback}/><Button kind="secondary" disabled={!!feedback}>Check my word</Button></div><small>{ownMessage}</small></form>}{feedback&&<div className={feedback.ok?"feedback good":"feedback bad"}><b>{feedback.ok?"Correct — nice work.":"Not quite. The answer is "+question.answer+"."}</b><p>{question.explanation}</p><Button onClick={()=>finished?undefined:loadQuestion()} disabled={!!finished}>{finished?"Round complete":"Next question →"}</Button></div>}</div>}
-    {finished&&<div className="input-panel"><span className="eyebrow">SESSION COMPLETE</span><div className="score">{round.score} / 10</div><h2>{round.score===10?"Perfect round.":round.score>=8?"Strong recall.":round.score>=5?"You're making progress.":"Keep practising — repetition builds recall."}</h2>{round.missed.map((m,i)=><div className="missed" key={i}><b>{m.prompt}</b><p>Answer: {m.answer}</p><small>{m.explanation}</small></div>)}<Button onClick={start}>Start another round ↗</Button> <Button kind="secondary" onClick={()=>setRound(null)}>Change settings</Button></div>}
+    {finished&&<div className="input-panel"><span className="eyebrow">SESSION COMPLETE</span><div className="score">{round.score} / 10</div>{scores.length>1&&round.score>Math.max(...scores.slice(0,-1).map(s=>s.score))&&<p className="new-best">New personal best.</p>}<h2>{round.score===10?"Perfect round.":round.score>=8?"Strong recall.":round.score>=5?"You're making progress.":"Keep practising — repetition builds recall."}</h2>{round.missed.map((m,i)=><div className="missed" key={i}><b>{m.prompt}</b><p>Answer: {m.answer}</p><small>{m.explanation}</small></div>)}<Button onClick={start}>Start another round ↗</Button> <Button kind="secondary" onClick={()=>setRound(null)}>Change settings</Button></div>}
    </section>}
   </main>
   <footer><span className="brand-icon small">N<span>.</span></span><b>NUMBER STORIES</b><span>Turn numbers into stories worth remembering.</span></footer>
