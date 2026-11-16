@@ -36,7 +36,7 @@ h1,h2,h3{font-family:var(--serif);font-weight:400;margin:0}
 .topbar nav{display:flex;gap:4px}
 .topbar nav button{border:0;background:none;padding:8px 16px;min-height:44px;font-weight:600;color:var(--soft);border-radius:6px}
 .topbar nav button:hover{color:var(--ink)}
-.topbar nav button.active{color:var(--ink);background:var(--hl);background-size:100% 1.15em;background-position:0 35%}
+.topbar nav button.active{color:var(--ink);background:var(--hl);background-size:100% 1.15em;background-position:0 62%}
 .header-actions{display:flex;align-items:center;gap:14px}
 .top-note{display:none}
 .theme-toggle{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:8px 14px;border:2px solid var(--ink);border-radius:999px;background:transparent;font-size:14px;font-weight:600}
@@ -86,7 +86,7 @@ label{display:block;font-weight:700;margin:12px 0 8px}
 .target-row.wrap{margin-bottom:8px}
 .target-row button{min-height:44px;padding:8px 14px;border:2px solid var(--line);border-radius:999px;background:transparent;font-weight:600;color:var(--ink)}
 .target-row button:hover{border-color:var(--ink)}
-.target-row button.chosen{border-color:var(--ink);background:var(--hl);background-size:100% 1.15em;background-position:0 35%;color:var(--marker-text)}
+.target-row button.chosen{border-color:var(--ink);background:var(--hl);background-size:100% 1.15em;background-position:0 62%;color:var(--marker-text)}
 :root[data-theme="dark"] .target-row button.chosen{color:var(--marker-text)}
 
 /* results: number rows with sticky story at wide widths */
@@ -175,6 +175,16 @@ mark{background:var(--hl);background-size:100% 1.2em;background-position:center;
 .missed{border-left:4px solid var(--no);padding:6px 12px;margin:12px 0}
 .missed p,.missed small{color:var(--soft);margin:2px 0}
 
+.progress-card{margin-top:6px}
+.stat-row{display:flex;gap:28px;flex-wrap:wrap;margin:8px 0 18px}
+.stat-row b{display:block;font:400 34px var(--serif);font-variant-numeric:lining-nums;color:var(--biro);line-height:1.1}
+.stat-row small{color:var(--soft);font-size:14px}
+.trend{display:flex;align-items:flex-end;gap:8px;height:120px;padding-bottom:22px;border-bottom:2px solid var(--ink);max-width:480px}
+.trend span{position:relative;flex:0 1 44px;height:100%;display:flex;align-items:flex-end}
+.trend i{display:block;width:100%;background:var(--biro);border-radius:4px 4px 0 0;min-height:3px}
+.trend em{position:absolute;left:0;right:0;bottom:-22px;text-align:center;font:600 13px var(--sans);font-style:normal;color:var(--soft)}
+.link-btn{margin-top:16px;min-height:44px;border:0;background:none;color:var(--no);font-weight:700;text-decoration:underline;padding:0}
+.new-best{display:inline;background:var(--hl);background-size:100% 1.15em;background-position:0 62%;color:var(--marker-text);font-weight:700;padding:0 .3em}
 footer{display:flex;align-items:center;gap:12px;padding:22px max(5vw,20px);border-top:2px solid var(--ink);color:var(--soft);font-size:14px}
 footer b{color:var(--ink);font-weight:700}
 footer>span:last-child{margin-left:auto}
