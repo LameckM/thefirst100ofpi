@@ -5,8 +5,8 @@ const MAP = [
  ["0","S · Z","Zero starts with Z","sea"],["1","T · D · TH","T has one downstroke","tie"],
  ["2","N","N has two legs","hen"],["3","M","M has three legs","ham"],
  ["4","R","R ends the word four","ray"],["5","L","L is the Roman numeral for 50","owl"],
- ["6","J · CH · SH","A flipped 6 looks like J","shoe"],["7","K · hard G","A capital K is built from two 7s","key"],
- ["8","F · V","A handwritten f has two loops","ivy"],["9","P · B","A flipped 9 looks like P","bee"]
+ ["6","J · CH · SH","A flipped 6 looks like J","shoe"],["7","K · C · Q · CK hard G","A capital K is built from two 7s","key"],
+ ["8","F · V· PH","A handwritten f has two loops","ivy"],["9","P · B","A flipped 9 looks like P","bee"]
 ];
 async function api(path, options) {
  const response = await fetch(API + path, options);
