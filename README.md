@@ -32,11 +32,12 @@ Practice runs 10-question rounds. Question types are digit to sounds, sound to d
 3. `major.py` splits your number into chunks (2, 3 or 4 digits per word, your choice) using a small dynamic program, picking the best-scoring word for each chunk and avoiding repeats. It also decodes any word back to digits with a sound-by-sound breakdown.
 4. `quiz.py` builds the practice questions from the same database, and checks every answer against the dictionary.
 5. A template builds the story that links the words in order.
+6. Numbers with no single word (like 399) get a compound: two real words joined, such as map + boy = "mapboy". Both halves must be picturable words, the blend is never allowed if its spelling is already a different real word, and real words always rank above compounds. Every 3 digit number is covered this way, and all 4 digit numbers except 8989. The card shows the two halves under the compound, and the Learn decoder splits compounds back into sounds.
 
 ## API
 
-- `GET /api/encode?number=3141592&target=3` returns chunks, alternatives and a story
-- `GET /api/words?digits=141&limit=40` returns more words for one chunk
+- `GET /api/encode?number=3141592&target=3` returns chunks, alternatives and a story (add `compounds=false` to turn off the two-word blends)
+- `GET /api/words?digits=141&limit=40` returns more words for one chunk (blends plus a `hints` map when the number has no single word)
 - `POST /api/story` with `{"words": [...], "digits": [...], "variant": 0}` rebuilds the story
 - `GET /api/decode?word=phone` returns the number for any word, sound by sound
 - `GET /api/check-word?word=tulip&digits=159` checks whether a word stands for a number

@@ -61,12 +61,28 @@ def _steps(phones):
     return out
 
 
-def decode_word(word):
+def _decode_compound(word):
+    """'mapboy' -> every pronunciation of map + boy, for each way to split it in two."""
+    d = pron()
+    out = []
+    for k in range(2, len(word) - 1):
+        a, b = word[:k], word[k:]
+        if a in d and b in d:
+            out.append(d[a][0] + d[b][0])
+    return out
+
+
+def decode_word(word, compound=False):
     """Every way of saying `word`, as digits plus the sound-by-sound steps.
 
-    Returns None if the dictionary doesn't know the word.
+    Returns None if the dictionary doesn't know the word. With compound=True,
+    a word that is two dictionary words stuck together ('mapboy') is decoded
+    as the two halves joined.
     """
-    prons = pron().get(word.strip().lower())
+    w = word.strip().lower()
+    prons = pron().get(w)
+    if not prons and compound:
+        prons = _decode_compound(w) or None
     if not prons:
         return None
     seen, out = set(), []
@@ -104,15 +120,51 @@ def words_for(conn, digits, limit=12):
     return [{"word": r["word"], "score": round(r["score"], 2)} for r in rows]
 
 
+MIN_PART_SCORE = 5.0       # both halves of a compound must be decent, picturable words
+COMPOUND_PENALTY = 1.0     # a compound always ranks below a real word of similar quality
+
+
+def compound_words(conn, digits, limit=12, per_side=6):
+    """Blends of two real words for digit strings that have no single word.
+
+    399 has no word, but 3 + 99 -> 'ma' + 'pie' and 39 + 9 -> 'map' + 'boy'.
+    Joined, they become 'mapboy': two clear pictures that still decode back to 399.
+    Returns [{"word", "score", "parts"}], best first.
+    """
+    out, seen = [], set()
+    real = pron()
+    for k in range(1, len(digits)):
+        left = [w for w in words_for(conn, digits[:k], per_side) if w["score"] >= MIN_PART_SCORE]
+        right = [w for w in words_for(conn, digits[k:], per_side) if w["score"] >= MIN_PART_SCORE]
+        for a in left:
+            for b in right:
+                if a["word"] in b["word"] or b["word"] in a["word"]:
+                    continue   # 'house' + 'houses' is one picture, not two
+                word = a["word"] + b["word"]
+                if word in seen or word in real:
+                    continue   # already a real word, and it may sound different ('mom' + 'ma' = 'momma')
+                seen.add(word)
+                out.append({
+                    "word": word,
+                    "score": round((a["score"] + b["score"]) / 2 - COMPOUND_PENALTY, 2),
+                    "parts": [a["word"], b["word"]],
+                })
+    out.sort(key=lambda c: (-c["score"], c["word"]))
+    return out[:limit]
+
+
 def clean_number(raw):
     return re.sub(r"\D", "", raw or "")
 
 
-def segment(conn, digits, target=3, max_len=4, alt_count=12):
+def segment(conn, digits, target=3, max_len=4, alt_count=12, compounds=True):
     """Split `digits` into chunks and pick a word for each.
 
     Cost per chunk = (11 - word score) + 3 * |len - target|, so the split
     leans toward `target` digits per word but will bend for a better word.
+
+    When a chunk of 3 or more digits has no real word, and `compounds` is on,
+    a blend of two real words stands in for it (see compound_words).
     """
     n = len(digits)
     cache = {}
@@ -120,7 +172,10 @@ def segment(conn, digits, target=3, max_len=4, alt_count=12):
     def cands(i, L):
         key = (i, L)
         if key not in cache:
-            cache[key] = words_for(conn, digits[i:i + L], alt_count)
+            found = words_for(conn, digits[i:i + L], alt_count)
+            if not found and compounds and L >= 3:
+                found = compound_words(conn, digits[i:i + L], alt_count)
+            cache[key] = found
         return cache[key]
 
     INF = float("inf")
@@ -156,11 +211,15 @@ def segment(conn, digits, target=3, max_len=4, alt_count=12):
         alts = cands(i, L)
         pick = next((a for a in alts if a["word"] not in used), alts[0])
         used.add(pick["word"])
-        chunks.append({
+        chunk = {
             "digits": digits[i:i + L],
             "word": pick["word"],
             "alternatives": [a["word"] for a in alts],
-        })
+        }
+        hints = {a["word"]: " + ".join(a["parts"]) for a in alts if "parts" in a}
+        if hints:
+            chunk["hints"] = hints
+        chunks.append(chunk)
     return chunks
 
 

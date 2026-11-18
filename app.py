@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from major import build_story, clean_number, connect, decode_word, segment, words_for
+from major import build_story, clean_number, compound_words, connect, decode_word, segment, words_for
 from quiz import make_question
 
 MAX_DIGITS = 300
@@ -27,13 +27,17 @@ class StoryRequest(BaseModel):
 
 
 @app.get("/api/encode")
-def encode(number: str = Query(..., min_length=1), target: int = Query(3, ge=1, le=4)):
+def encode(
+    number: str = Query(..., min_length=1),
+    target: int = Query(3, ge=1, le=4),
+    compounds: bool = Query(True),
+):
     digits = clean_number(number)
     if not digits:
         raise HTTPException(400, "Enter at least one digit.")
     if len(digits) > MAX_DIGITS:
         raise HTTPException(400, f"Keep it to {MAX_DIGITS} digits or fewer.")
-    chunks = segment(conn, digits, target=target)
+    chunks = segment(conn, digits, target=target, compounds=compounds)
     if not chunks:
         raise HTTPException(422, "Could not find words for that number.")
     story = build_story([c["word"] for c in chunks], [c["digits"] for c in chunks])
@@ -47,7 +51,12 @@ def encode(number: str = Query(..., min_length=1), target: int = Query(3, ge=1, 
 
 @app.get("/api/words")
 def more_words(digits: str = Query(..., pattern=r"^\d{1,4}$"), limit: int = Query(40, ge=1, le=100)):
-    return {"digits": digits, "words": [w["word"] for w in words_for(conn, digits, limit)]}
+    found = words_for(conn, digits, limit)
+    if not found and len(digits) >= 3:
+        # no single word for this number: offer blends of two real words instead
+        found = compound_words(conn, digits, limit)
+    hints = {w["word"]: " + ".join(w["parts"]) for w in found if "parts" in w}
+    return {"digits": digits, "words": [w["word"] for w in found], "hints": hints}
 
 
 @app.post("/api/story")
@@ -65,7 +74,7 @@ WORD_RE = r"^[A-Za-z'\-]{1,40}$"
 def decode(word: str = Query(..., pattern=WORD_RE)):
     """Turn any English word into its Major System number, sound by sound."""
     w = word.strip().lower()
-    opts = decode_word(w)
+    opts = decode_word(w, compound=True)
     return {"word": w, "found": opts is not None, "options": opts or []}
 
 

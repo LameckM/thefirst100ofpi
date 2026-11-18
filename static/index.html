@@ -58,6 +58,7 @@
   .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; align-items: start; }
   .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
   .card .n { font: .85rem ui-monospace, Menlo, monospace; color: var(--muted); }
+  .card .hint { font-size: .8rem; color: var(--muted); margin: -4px 0 8px; }
   .card .w { font-size: 1.5rem; font-weight: 700; margin: 2px 0 8px; overflow-wrap: anywhere; }
   .alts { display: flex; flex-wrap: wrap; gap: 5px; }
   .alts button { padding: 2px 9px; font-size: .85rem; background: transparent; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; }
@@ -369,7 +370,10 @@ function renderCards() {
       m.addEventListener("click", () => expand(i));
       alts.appendChild(m);
     }
-    card.append(el("div", "n", c.digits), el("div", "w", c.word), alts);
+    const hint = c.hints && c.hints[c.word];
+    card.append(el("div", "n", c.digits), el("div", "w", c.word));
+    if (hint) card.append(el("div", "hint", hint));
+    card.append(alts);
     box.appendChild(card);
   });
 }
@@ -418,6 +422,7 @@ async function expand(i) {
   try {
     const j = await api(`/api/words?digits=${state.chunks[i].digits}&limit=40`);
     state.chunks[i].alternatives = j.words;
+    state.chunks[i].hints = j.hints || state.chunks[i].hints;
     state.chunks[i].expanded = true;
     renderCards();
   } catch (e) { setMsg(e.message); }
