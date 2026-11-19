@@ -237,3 +237,152 @@ footer>span:last-child{margin-left:auto}
  footer>span:last-child{width:100%;margin-left:0}
 }
 @media(prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+
+
+/* Dark mode — restrained charcoal palette inspired by the supplied reference.
+   This is intentionally colour-only: layout, spacing and component structure stay unchanged. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #202226;
+  --sheet: #292c31;
+  --ink: #e3e3e1;
+  --soft: #92959a;
+  --line: #383c42;
+  --biro: #c4c7ca;
+  --marker: #55595f;
+  --marker-text: #f0f0ee;
+  --go: #a7c5b4;
+  --go-bg: #303a35;
+  --no: #d0a1a5;
+  --no-bg: #3b2e31;
+  --hl: linear-gradient(to bottom, transparent 0 46%, var(--marker) 46% 94%, transparent 94%) no-repeat;
+}
+
+:root[data-theme="dark"] body {
+  background:
+    radial-gradient(ellipse at 50% 34%, rgba(255,255,255,.055), transparent 48%),
+    linear-gradient(145deg, #292c31 0%, #202226 58%, #1c1e22 100%);
+}
+
+:root[data-theme="dark"] .topbar {
+  background: rgba(32,34,38,.88);
+  border-bottom: 1px solid #34383e;
+}
+
+:root[data-theme="dark"] .input-panel,
+:root[data-theme="dark"] .lesson,
+:root[data-theme="dark"] .quiz-panel,
+:root[data-theme="dark"] .starter,
+:root[data-theme="dark"] .callout,
+:root[data-theme="dark"] .story-panel {
+  background: rgba(41,44,49,.88);
+  border: 1px solid #34383e;
+  box-shadow: 0 14px 38px rgba(0,0,0,.16);
+}
+
+:root[data-theme="dark"] .word-card {
+  background: #25282d;
+  border: 1px solid #363a40;
+}
+
+:root[data-theme="dark"] .brand-icon {
+  background: #d8d9d7;
+  color: #25272b;
+}
+
+:root[data-theme="dark"] .brand-icon span {
+  color: #777b80;
+}
+
+:root[data-theme="dark"] .theme-toggle {
+  border: 1px solid #555a61;
+  color: #d8d9d7;
+}
+
+:root[data-theme="dark"] .theme-toggle:hover,
+:root[data-theme="dark"] .button.secondary:hover {
+  background: #d8d9d7;
+  border-color: #d8d9d7;
+  color: #25272b;
+}
+
+:root[data-theme="dark"] .button.primary {
+  background: #c4c7ca;
+  border-color: #c4c7ca;
+  color: #25272b;
+}
+
+:root[data-theme="dark"] .button.primary:hover {
+  background: #e1e2e0;
+  border-color: #e1e2e0;
+  color: #25272b;
+}
+
+:root[data-theme="dark"] .button.secondary {
+  border-color: #555a61;
+}
+
+:root[data-theme="dark"] .button.quiet {
+  color: #c4c7ca;
+}
+
+:root[data-theme="dark"] .target-row button {
+  border-color: #454a51;
+}
+
+:root[data-theme="dark"] .target-row button.chosen {
+  border-color: #aeb2b6;
+  color: #f0f0ee;
+}
+
+:root[data-theme="dark"] .input-row input,
+:root[data-theme="dark"] .personal-word-form input,
+:root[data-theme="dark"] .own-form input {
+  border-bottom-color: #686d74;
+}
+
+:root[data-theme="dark"] .input-row input:focus-visible {
+  border-bottom-color: #d0d2d1;
+  box-shadow: 0 3px 0 #d0d2d1;
+}
+
+:root[data-theme="dark"] .alternatives button,
+:root[data-theme="dark"] .answer-grid button {
+  background: #292c31;
+  border-color: #454a51;
+}
+
+:root[data-theme="dark"] .alternatives button:hover {
+  border-color: #c4c7ca;
+  color: #e3e3e1;
+}
+
+:root[data-theme="dark"] .answer-grid button:hover:not(:disabled) {
+  background: #3a3e44;
+  color: #f0f0ee;
+}
+
+:root[data-theme="dark"] .progress span,
+:root[data-theme="dark"] .trend i {
+  background: #b9bdc1;
+}
+
+:root[data-theme="dark"] footer {
+  border-top: 1px solid #34383e;
+}
+
+:root[data-theme="dark"] .topbar nav button.active {
+  color: #f0f0ee;
+}
+
+:root[data-theme="dark"] mark {
+  color: #f0f0ee;
+}
+
+@media (max-width: 720px) {
+  :root[data-theme="dark"] .topbar nav {
+    background: rgba(32,34,38,.96);
+    border-top: 1px solid #34383e;
+    backdrop-filter: blur(12px);
+  }
+}
