@@ -59,6 +59,10 @@ Personal-word endpoints:
 - `POST /api/personal-words` with `{"word":"tarot","digits":"141"}`
 - `DELETE /api/personal-words?word=tarot&digits=141`
 
+## Compound words for numbers with no word
+
+Some digit groups (like 399) have no single dictionary word. When a group of 3 or 4 digits has none, the engine joins two real, picturable words whose sounds add up to the group: map + boy = "mapboy". Group boundaries never move, real words and your saved personal words always rank first, and a blend is skipped if its spelling is already a different real word. The card shows the two halves, and the Learn decoder splits a compound back into sounds.
+
 ## Main experiences
 
 - **Create:** encode a number, choose 2–4 digits per word, swap alternative images, regenerate the story and copy the result.
@@ -67,8 +71,8 @@ Personal-word endpoints:
 
 ## API endpoints
 
-- `GET /api/encode?number=3141592&target=3`
-- `GET /api/words?digits=141&limit=40`
+- `GET /api/encode?number=3141592&target=3` (add `compounds=false` to turn off two-word blends)
+- `GET /api/words?digits=141&limit=40` (returns a `hints` map when a number only has blends)
 - `POST /api/story`
 - `GET /api/decode?word=phone`
 - `GET /api/check-word?word=tulip&digits=159`

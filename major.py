@@ -61,12 +61,28 @@ def _steps(phones):
     return out
 
 
-def decode_word(word):
+def _decode_compound(word):
+    """'mapboy' -> every pronunciation of map + boy, for each way to split it in two."""
+    d = pron()
+    out = []
+    for k in range(2, len(word) - 1):
+        a, b = word[:k], word[k:]
+        if a in d and b in d:
+            out.extend(pa + pb for pa in d[a] for pb in d[b])
+    return out
+
+
+def decode_word(word, compound=False):
     """Every way of saying `word`, as digits plus the sound-by-sound steps.
 
-    Returns None if the dictionary doesn't know the word.
+    Returns None if the dictionary doesn't know the word. With compound=True,
+    a word that is two dictionary words stuck together ('mapboy') is decoded
+    as the two halves joined.
     """
-    prons = pron().get(word.strip().lower())
+    w = word.strip().lower()
+    prons = pron().get(w)
+    if not prons and compound:
+        prons = _decode_compound(w) or None
     if not prons:
         return None
     seen, out = set(), []
@@ -162,17 +178,54 @@ def delete_personal_word(conn, word, digits):
     conn.commit()
 
 
+MIN_PART_SCORE = 5.0       # both halves of a compound must be decent, picturable words
+COMPOUND_PENALTY = 1.0     # a compound always ranks below a real word of similar quality
+
+
+def compound_words(conn, digits, limit=12, per_side=6):
+    """Blends of two real words for digit strings that have no single word.
+
+    399 has no word, but 3 + 99 -> 'ma' + 'pie' and 39 + 9 -> 'map' + 'boy'.
+    Joined, they become 'mapboy': two clear pictures that still decode back to 399.
+    Returns [{"word", "score", "parts"}], best first.
+    """
+    out, seen = [], set()
+    real = pron()
+    for k in range(1, len(digits)):
+        left = [w for w in words_for(conn, digits[:k], per_side) if w["score"] >= MIN_PART_SCORE]
+        right = [w for w in words_for(conn, digits[k:], per_side) if w["score"] >= MIN_PART_SCORE]
+        for a in left:
+            for b in right:
+                if a["word"] in b["word"] or b["word"] in a["word"]:
+                    continue   # 'house' + 'houses' is one picture, not two
+                word = a["word"] + b["word"]
+                if word in seen or word in real:
+                    continue   # already a real word, and it may sound different ('mom' + 'ma' = 'momma')
+                seen.add(word)
+                out.append({
+                    "word": word,
+                    "score": round((a["score"] + b["score"]) / 2 - COMPOUND_PENALTY, 2),
+                    "parts": [a["word"], b["word"]],
+                })
+    out.sort(key=lambda c: (-c["score"], c["word"]))
+    return out[:limit]
+
+
 def clean_number(raw):
     return re.sub(r"\D", "", raw or "")
 
 
-def segment(conn, digits, target=3, max_len=4, alt_count=12):
+def segment(conn, digits, target=3, max_len=4, alt_count=12, compounds=True):
     """Split digits into consecutive, fixed-width chunks.
 
     The selected target is a grouping size, not a scoring preference:
     target=2 gives 14-15-92..., target=3 gives 141-592..., etc.
     A final short chunk is retained when the input length is not divisible
     by target. Every word candidate must encode that exact chunk.
+
+    If a chunk of 3 or more digits has no real word, and `compounds` is on,
+    a blend of two real words (399 -> 'mapboy' = map + boy) fills the gap.
+    The group boundaries never move.
     """
     if target not in (2, 3, 4):
         raise ValueError("target must be 2, 3, or 4")
@@ -189,15 +242,21 @@ def segment(conn, digits, target=3, max_len=4, alt_count=12):
             item for item in words_for(conn, chunk_digits, alt_count)
             if item["word"] not in {saved["word"] for saved in personal}
         ]
+        if not candidates and compounds and len(chunk_digits) >= 3:
+            candidates = compound_words(conn, chunk_digits, alt_count)
         pick = next((item for item in candidates if item["word"] not in used), candidates[0] if candidates else None)
         if pick:
             used.add(pick["word"])
-        chunks.append({
+        chunk = {
             "digits": chunk_digits,
             # Preserve the exact number boundary even without a dictionary match.
             "word": pick["word"] if pick else "",
             "alternatives": [item["word"] for item in candidates],
-        })
+        }
+        hints = {item["word"]: " + ".join(item["parts"]) for item in candidates if "parts" in item}
+        if hints:
+            chunk["hints"] = hints
+        chunks.append(chunk)
     return chunks
 
 
