@@ -107,20 +107,33 @@ function Slot({value,onChange,placeholder,label}) {
  useEffect(()=>{const el=ref.current;if(el){el.style.height="auto";el.style.height=el.scrollHeight+"px";}},[value]);
  return <textarea ref={ref} className="own-slot" rows={1} value={value} maxLength={600} placeholder={placeholder} aria-label={label} onChange={e=>onChange(e.target.value)}/>;
 }
-function OwnStory({chunks,suggested,grouped}) {
+function OwnStory({chunks,suggested,grouped,number,openedId,openedTitle,onSave,onShowHistory}) {
  const n=chunks.length;
  const [slots,setSlots]=useState(()=>{const e=loadOwn()[grouped];const s=e&&Array.isArray(e.slots)?e.slots:[];return Array.from({length:n+1},(_,i)=>typeof s[i]==="string"?s[i]:"");});
  const [snap,setSnap]=useState(()=>{const e=loadOwn()[grouped];return e&&Array.isArray(e.words)&&e.words.length===n?e.words:chunks.map(c=>c.word);});
  const [copied,setCopied]=useState(false);
+ const [mode,setMode]=useState(null);
+ const [title,setTitle]=useState("");
+ const [note,setNote]=useState(null);
  const hasText=slots.some(x=>x.trim());
  useEffect(()=>{saveOwn(grouped,hasText?{slots,words:snap,at:Date.now()}:null);},[slots,snap]);
  useEffect(()=>{if(!hasText)setSnap(chunks.map(c=>c.word));},[chunks,hasText]);
+ useEffect(()=>{setNote(null);},[slots]);
  const setSlot=(i,v)=>setSlots(a=>a.map((x,k)=>k===i?v:x));
  const changed=i=>snap[i]&&chunks[i].word&&snap[i]!==chunks[i].word&&((slots[i]||"").trim()||(slots[i+1]||"").trim());
  const {parts,plain}=weave(slots,chunks);
  function useSuggested(){
   if(hasText&&!confirm("Replace what you wrote with the suggested story?"))return;
   setSlots(suggestedSlots(suggested,chunks));setSnap(chunks.map(c=>c.word));
+ }
+ const pieces=grouped.split("-");
+ const defaultTitle="Story for "+pieces.slice(0,3).join("-")+(pieces.length>3?"…":"");
+ function startNew(){setTitle(defaultTitle);setMode("new");}
+ function doSave(updateId){
+  const base={number,size:Math.max(2,chunks[0]?chunks[0].digits.length:3),grouped,words:chunks.map(c=>c.word),digits:chunks.map(c=>c.digits),slots,plain};
+  const r=onSave(base,updateId,title);
+  setMode(null);
+  setNote(r.ok?{ok:true,text:updateId?"Updated in your history.":"Saved to your history."}:{ok:false,text:"Couldn't save. Your browser may be blocking storage or it may be full."});
  }
  function clearAll(){if(confirm("Clear everything you wrote for this number?"))setSlots(Array(n+1).fill(""));}
  async function copy(){
@@ -139,9 +152,63 @@ function OwnStory({chunks,suggested,grouped}) {
    <Slot value={slots[n]||""} onChange={v=>setSlot(n,v)} label="Your text after the last scene" placeholder="How does it end? (optional)"/>
   </div>
   {hasText&&<div className="own-preview"><span className="eyebrow">Your story so far</span>
-   <p className="story-line">{parts.map((p,i)=><span key={i}>{p.space&&" "}{p.type==="word"?<mark title={p.digits}>{p.value}</mark>:p.value}</span>)}</p>
-   <div className="own-actions"><Button kind="secondary" onClick={copy}>{copied?"Copied":"Copy my story"}</Button><Button kind="quiet" onClick={clearAll}>Clear my text</Button></div></div>}
+   <p className="story-line"><Parts parts={parts}/></p>
+   <div className="own-actions">
+    {openedId?<Button onClick={()=>doSave(openedId)}>Update “{openedTitle}”</Button>:<Button onClick={startNew}>Save to history</Button>}
+    {openedId&&<Button kind="secondary" onClick={startNew}>Save as new copy</Button>}
+    <Button kind="secondary" onClick={copy}>{copied?"Copied":"Copy my story"}</Button>
+    <Button kind="quiet" onClick={clearAll}>Clear my text</Button>
+   </div>
+   {mode==="new"&&<form className="input-row save-form" onSubmit={e=>{e.preventDefault();doSave(null);}}><label htmlFor="story-title">Name this story so you can find it later</label><input id="story-title" value={title} maxLength={80} autoFocus onFocus={e=>e.target.select()} onChange={e=>setTitle(e.target.value)} placeholder="My story for this number"/><Button>Save</Button><Button kind="quiet" type="button" onClick={()=>setMode(null)}>Cancel</Button></form>}
+   {note&&<p className={note.ok?"save-ok":"palace-warn"} role="status">{note.text}{note.ok&&<> <button type="button" className="link-inline" onClick={onShowHistory}>View history</button></>}</p>}
+  </div>}
  </div>;
+}
+const HISTORY_KEY="number-stories-history";
+function loadHistory(){try{const v=JSON.parse(localStorage.getItem(HISTORY_KEY)||"[]");return Array.isArray(v)?v.filter(x=>x&&typeof x.id==="string"&&Array.isArray(x.slots)&&Array.isArray(x.words)&&Array.isArray(x.digits)):[];}catch{return [];}}
+function persistHistory(list){try{localStorage.setItem(HISTORY_KEY,JSON.stringify(list));return true;}catch{return false;}}
+function newId(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7);}
+function Parts({parts}){return parts.map((p,i)=><span key={i}>{p.space&&" "}{p.type==="word"?<mark title={p.digits}>{p.value}</mark>:p.value}</span>);}
+function HistoryCard({item,onOpen,onRename,onDelete}) {
+ const [editing,setEditing]=useState(false);
+ const [title,setTitle]=useState(item.title);
+ const [expanded,setExpanded]=useState(false);
+ const [copied,setCopied]=useState(false);
+ const chunks=item.words.map((w,i)=>({word:w,digits:item.digits[i]}));
+ const {parts,plain}=weave(item.slots,chunks);
+ const date=new Date(item.updatedAt||item.savedAt||Date.now()).toLocaleDateString(undefined,{day:"numeric",month:"short",year:"numeric"});
+ async function copy(){
+  try{await navigator.clipboard.writeText(item.title+"\n"+item.grouped+"\n\n"+chunks.map(c=>c.digits+" = "+c.word).join("\n")+"\n\n"+plain);setCopied(true);setTimeout(()=>setCopied(false),1500);}catch{}
+ }
+ function submit(e){e.preventDefault();const t=title.trim();if(t){onRename(item.id,t);setEditing(false);}}
+ return <article className="input-panel history-card">
+  {editing
+   ?<form className="input-row" onSubmit={submit}><input aria-label="Story title" value={title} maxLength={80} autoFocus onFocus={e=>e.target.select()} onChange={e=>setTitle(e.target.value)}/><Button kind="secondary">Save</Button><Button kind="quiet" type="button" onClick={()=>{setTitle(item.title);setEditing(false);}}>Cancel</Button></form>
+   :<h2>{item.title}</h2>}
+  <p className="digits">{item.grouped}</p>
+  <small className="hint">{item.words.filter(Boolean).length} images · saved {date}</small>
+  <p className={"story-line history-story"+(expanded?" open":"")}><Parts parts={parts}/></p>
+  {plain.length>240&&<button type="button" className="link-inline history-more" onClick={()=>setExpanded(v=>!v)}>{expanded?"Show less":"Read the full story"}</button>}
+  <div className="own-actions">
+   <Button onClick={()=>onOpen(item)}>Open in editor</Button>
+   <Button kind="secondary" onClick={copy}>{copied?"Copied":"Copy"}</Button>
+   <Button kind="quiet" onClick={()=>setEditing(true)}>Rename</Button>
+   <button type="button" className="link-btn" onClick={()=>{if(confirm("Delete “"+item.title+"”? This can't be undone."))onDelete(item.id);}}>Delete</button>
+  </div>
+ </article>;
+}
+function History({items,onOpen,onRename,onDelete,onCreate}) {
+ const [q,setQ]=useState("");
+ if(!items.length)return <div className="input-panel history-empty"><h2>Nothing saved yet</h2><p className="hint">Write a story on the Create page, press “Save to history” and give it a title. It will be waiting here.</p><Button onClick={onCreate}>Go to Create ↗</Button></div>;
+ const sorted=[...items].sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+ const needle=q.trim().toLowerCase();
+ const shown=needle?sorted.filter(x=>(x.title+" "+x.number+" "+x.words.join(" ")).toLowerCase().includes(needle)):sorted;
+ return <>
+  {items.length>3&&<div className="input-row history-toolbar"><input type="search" aria-label="Search saved stories" value={q} onChange={e=>setQ(e.target.value)} placeholder="Search by title, number or word..."/></div>}
+  <small className="hint history-note">Saved on this device only. Clearing your browser data removes them.</small>
+  <div className="history-list">{shown.map(item=><HistoryCard key={item.id} item={item} onOpen={onOpen} onRename={onRename} onDelete={onDelete}/>)}</div>
+  {needle&&!shown.length&&<p className="hint">No stories match “{q}”.</p>}
+ </>;
 }
 function Button({children,kind="primary",...props}) { return <button className={"button "+kind} {...props}>{children}</button>; }
 
@@ -168,6 +235,9 @@ export default function App() {
  const [library,setLibrary]=useState([]);
  const [libraryOpen,setLibraryOpen]=useState(false);
  const [scores,setScores]=useState(loadScores);
+ const [history,setHistory]=useState(loadHistory);
+ const [opened,setOpened]=useState(null);
+ const [ownNonce,setOwnNonce]=useState(0);
  const savedRound=useRef(null);
 
  function go(next) {
@@ -192,6 +262,43 @@ export default function App() {
  async function more(i) {
   try {const r=await api("/api/words?digits="+result.chunks[i].digits+"&limit=40");setResult(v=>({...v,chunks:v.chunks.map((c,n)=>n===i?{...c,alternatives:r.words,hints:{...(c.hints||{}),...(r.hints||{})},expanded:true}:c)}));}
   catch(e){setError(e.message);}
+ }
+ function saveStory(base,updateId,title) {
+  const now=Date.now();
+  const existing=updateId&&history.find(x=>x.id===updateId);
+  let next,id;
+  if(existing){id=existing.id;next=history.map(x=>x.id===id?{...x,...base,updatedAt:now}:x);}
+  else{id=newId();next=[{...base,id,title:(title||"").trim()||"Untitled story",savedAt:now,updatedAt:now},...history].slice(0,200);}
+  const ok=persistHistory(next);
+  setHistory(next);setOpened({id,grouped:base.grouped});
+  return {ok,id};
+ }
+ function renameStory(id,title) {
+  const next=history.map(x=>x.id===id?{...x,title,updatedAt:Date.now()}:x);
+  persistHistory(next);setHistory(next);
+ }
+ function deleteStory(id) {
+  const next=history.filter(x=>x.id!==id);
+  persistHistory(next);setHistory(next);
+  if(opened&&opened.id===id)setOpened(null);
+ }
+ async function openSaved(item) {
+  setError("");setBusy(true);
+  try {
+   const r=await api("/api/encode?number="+encodeURIComponent(item.number)+"&target="+item.size);
+   const draft=loadOwn()[r.grouped];
+   if(draft&&Array.isArray(draft.slots)&&draft.slots.some(x=>x.trim())&&JSON.stringify(draft.slots)!==JSON.stringify(item.slots)&&!confirm("You already have a draft for this number on the Create page. Replace it with this saved story?"))return;
+   const chunks=r.chunks.map((c,i)=>{const w=item.words[i];if(!w)return c;return {...c,word:w,alternatives:[w,...(c.alternatives||[]).filter(a=>a!==w)]};});
+   let suggested=r.story;
+   try{suggested=(await story(chunks.map(c=>c.word),chunks.map(c=>c.digits),0)).story;}catch{}
+   saveOwn(r.grouped,{slots:item.slots,words:item.words,at:Date.now()});
+   setNumber(item.number);setTarget(item.size);
+   setResult({...r,chunks,story:suggested});
+   setOpened({id:item.id,grouped:r.grouped});
+   setOwnNonce(n=>n+1);
+   go("create");
+   setTimeout(()=>document.querySelector(".own-story")?.scrollIntoView({behavior:"smooth",block:"start"}),250);
+  } catch(e){setError(e.message);} finally{setBusy(false);}
  }
  async function decode() {
   try {setDecoded(await api("/api/decode?word="+encodeURIComponent(word.trim())));}
@@ -245,6 +352,7 @@ export default function App() {
   } catch(e){setOwnMessage(e.message);}
  }
  const finished=round&&round.n===round.total&&feedback;
+ const openedItem=opened&&result&&opened.grouped===result.grouped?history.find(x=>x.id===opened.id):null;
  useEffect(()=>{
   if(!finished||savedRound.current===round.id)return;
   savedRound.current=round.id;
@@ -259,7 +367,7 @@ export default function App() {
  return <div className="shell">
   <header className="topbar">
    <button className="brand" onClick={()=>go("create")}><span className="brand-icon">N<span>.</span></span><span>number stories<small>MAKE NUMBERS MEMORABLE</small></span></button>
-   <nav>{["create","learn","practice"].map(v=><button key={v} className={view===v?"active":""} onClick={()=>go(v)}>{v[0].toUpperCase()+v.slice(1)}</button>)}</nav>
+   <nav>{["create","learn","practice","history"].map(v=><button key={v} className={view===v?"active":""} onClick={()=>go(v)}>{v[0].toUpperCase()+v.slice(1)}</button>)}</nav>
    <div className="header-actions"><button className="theme-toggle" onClick={()=>setTheme(v=>v==="light"?"dark":"light")} aria-label={"Switch to "+(theme==="light"?"dark":"light")+" mode"} title={"Switch to "+(theme==="light"?"dark":"light")+" mode"}><span aria-hidden="true">{theme==="light"?"☾":"☀"}</span><span>{theme==="light"?"Dark mode":"Light mode"}</span></button><span className="top-note">THE MAJOR SYSTEM <i/></span></div>
   </header>
   <main>
@@ -272,11 +380,12 @@ export default function App() {
      <div className="story-panel"><div className="result-head"><div><span className="eyebrow">03 / CONNECT THE SCENES</span><h2>Your story</h2></div><Button kind="secondary" onClick={()=>navigator.clipboard.writeText(result.grouped+"\n\n"+result.chunks.map(c=>c.digits+" = "+c.word).join("\n")+"\n\n"+result.story.map(s=>s.replace(/\[\[([^\]|]+)\|?[^\]]*\]\]/g,"$1")).join(" "))}>Copy story</Button></div>{result.story.map((s,i)=><p className="story-line" key={i}>{s.split(/(\[\[[^\]]+\]\])/g).map((part,j)=>part.startsWith("[[")?<mark key={j}>{part.match(/\[\[([^\]|]+)/)?.[1]}</mark>:part)}</p>)}<small className="hint">Make each scene unusual, oversized and full of movement. The stranger it feels, the easier it is to recall.</small></div>
     </section>}
     {!result&&<div className="starter"><h2>From abstract digits to unforgettable scenes.</h2><p><b>01 Encode</b> — digits become consonant sounds and words.</p><p><b>02 Visualise</b> — choose images that feel clear and personal.</p><p><b>03 Connect</b> — link each image into one memorable story.</p></div>}
-    {result&&<OwnStory key={result.grouped} chunks={result.chunks} suggested={result.story} grouped={result.grouped}/>}
+    {result&&<OwnStory key={result.grouped+":"+ownNonce} chunks={result.chunks} suggested={result.story} grouped={result.grouped} number={result.digits} openedId={openedItem?openedItem.id:null} openedTitle={openedItem?openedItem.title:""} onSave={saveStory} onShowHistory={()=>go("history")}/>}
     <Palace chunks={result?result.chunks:[]}/>
     <div className="input-panel personal-library"><div className="result-head"><div><span className="eyebrow">YOUR CUSTOM VOCABULARY</span><h2>Personal Word Library</h2><p>Words you save are preferred whenever the same number group appears again.</p></div><Button kind="secondary" onClick={loadLibrary}>{libraryOpen?"Refresh library":"View saved words"}</Button></div>{libraryOpen&&<div className="library-list">{library.length?library.map((item,i)=><div className="library-item" key={item.word+"-"+item.digits}><span><b>{item.word}</b><small>{item.digits}</small></span><button onClick={()=>removeLibraryWord(item.word,item.digits)}>Remove</button></div>):<p className="hint">No personal words saved yet. Add one to a number group above.</p>}</div>}</div>
     <div className="callout"><span>NEW TO THIS TECHNIQUE?</span><p>Learn the simple sound code behind every number.</p><Button kind="secondary" onClick={()=>go("learn")}>Explore the method ↗</Button></div>
    </section>}
+   {view==="history"&&<section><div className="hero"><span className="eyebrow">YOUR LIBRARY</span><h1>Your saved <em>stories.</em></h1><p>Every story you save lives here. Open one to keep working on it, or read it again to recall the number.</p></div><History items={history} onOpen={openSaved} onRename={renameStory} onDelete={deleteStory} onCreate={()=>go("create")}/></section>}
    {view==="learn"&&<section><div className="hero"><span className="eyebrow">THE METHOD</span><h1>Learn the <em>Major System.</em></h1><p>A sound-based code that turns hard-to-recall numbers into words, pictures and stories.</p></div><div className="lesson"><span className="eyebrow">01 / THE BIG IDEA</span><h2>Your brain remembers pictures better than digits.</h2><p>Each digit maps to a consonant sound. Add vowels to make a word, turn that word into a mental image, and connect images in sequence.</p></div><div className="input-panel"><span className="eyebrow">02 / THE SOUND CODE</span><h2>Ten digits. Ten sound groups.</h2><div className="digit-grid">{MAP.map(([d,s,h,w])=><article key={d}><b>{d}</b><div><strong>{s}</strong><p>{h}</p><small>EXAMPLE · {w}</small></div></article>)}</div></div><div className="lesson"><span className="eyebrow">03 / FOUR RULES</span><h2>Sound matters. Spelling doesn't.</h2><ul><li><b>Ignore vowels, H, W and Y.</b> They help form words but carry no digits.</li><li><b>Listen for consonant sounds.</b> Phone begins with an F sound, so it maps to 8.</li><li><b>One sound, one digit.</b> A double letter making one sound counts once.</li><li><b>Letters can change sound.</b> Soft C sounds like S; hard C sounds like K.</li></ul></div><div className="input-panel"><span className="eyebrow">04 / TRY IT YOURSELF</span><h2>Decode any word.</h2><form className="input-row" onSubmit={e=>{e.preventDefault();decode();}}><input value={word} onChange={e=>setWord(e.target.value)} placeholder="Try phone..." aria-label="Word to decode"/><Button>Decode word</Button></form>{decoded&&(!decoded.found?<p>Word not found. Try another.</p>:decoded.options.map((o,i)=><p key={i} className="decode-line">{o.steps.map(s=>s.sound+" = "+s.digit).join(" · ")} <b>→ {o.digits||"no digits"}</b></p>))}</div><Button onClick={()=>go("practice")}>I'm ready to practise ↗</Button></section>}
    {view==="practice"&&<section><div className="hero"><span className="eyebrow">BUILD RECALL</span><h1>Train your <em>memory.</em></h1><p>Short, focused rounds help you learn the sound code until it becomes automatic.</p></div>{!round&&<div className="input-panel"><h2>Set up a practice round</h2><label>Question type</label><div className="target-row wrap">{[["mix","Everything"],["sounds","Digit to sounds"],["digit","Sound to digit"],["word","Word to number"],["number","Number to word"]].map(([v,l])=><button key={v} className={kind===v?"chosen":""} onClick={()=>setKind(v)}>{l}</button>)}</div><label>Difficulty</label><div className="target-row"><button className={level==="easy"?"chosen":""} onClick={()=>setLevel("easy")}>Easy</button><button className={level==="medium"?"chosen":""} onClick={()=>setLevel("medium")}>Medium</button></div><p className="hint">Easy uses 1–2 digit numbers. Medium uses 3-digit numbers and trickier spellings.</p><Button onClick={start}>Start 10-question round ↗</Button></div>}
     {!round&&<div className="input-panel"><h2>Your progress</h2><Progress scores={scores} onClear={()=>{setScores([]);saveScores([]);}}/></div>}

@@ -218,6 +218,22 @@ mark{background:var(--hl);background-size:100% 1.2em;background-position:center;
 .own-note button{border:0;background:none;color:inherit;font-weight:700;text-decoration:underline;padding:0 0 0 6px}
 .own-preview{margin-top:22px;border-top:2px dotted var(--line);padding-top:14px}
 .own-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:6px}
+.save-form{flex-wrap:wrap;margin-top:16px}
+.save-form label{width:100%;margin:0 0 -4px;font-size:14px;color:var(--soft)}
+.save-ok{color:var(--go);font-weight:600;margin:12px 0 0}
+.link-inline{border:0;background:none;color:inherit;font:inherit;font-weight:700;text-decoration:underline;text-underline-offset:3px;padding:0}
+.history-toolbar{margin:0 0 6px}
+.history-note{margin:0 0 20px}
+.history-list{display:grid;gap:18px}
+.history-card h2{font-size:26px;margin:0 0 4px}
+.history-card .digits{margin:2px 0}
+.history-card .hint{margin-top:4px}
+.history-story{margin:14px 0 6px;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+.history-story.open{display:block}
+.history-more{display:block;margin:0 0 6px}
+.own-actions .link-btn{margin-top:0;padding:0 10px}
+.history-empty{max-width:640px}
+.history-empty .hint{margin:6px 0 18px}
 @media(max-width:720px){.own-story .result-head .button{width:100%}.own-chip mark{font-size:24px}}
 footer{display:flex;align-items:center;gap:12px;padding:22px max(5vw,20px);border-top:2px solid var(--edge);color:var(--soft);font-size:14px}
 footer b{color:var(--ink);font-weight:700}

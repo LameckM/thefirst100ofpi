@@ -261,9 +261,11 @@ def segment(conn, digits, target=3, max_len=4, alt_count=12, compounds=True):
 
 
 # ---------------------------------------------------------------- stories
-
-def _art(word):
-    return ("an " if word[0] in "aeiou" else "a ") + word
+#
+# A word is only ever written once in a story, as its own marker, and the text
+# around it never names another word or puts "a/an" in front of it. The previous
+# image is called "it", and every word gets "the". That keeps a story correct
+# when someone swaps a word, and lets the editor cut it cleanly at each word.
 
 
 def _mark(word, digits=""):
@@ -271,24 +273,29 @@ def _mark(word, digits=""):
 
 
 OPENERS = [
-    "Start with {B}, as big as a bus, standing right in front of you.",
-    "Picture {B} sitting in the middle of the room, glowing bright orange.",
-    "Imagine {B} the size of a house blocking the doorway.",
+    "Start with the {B}, as big as a bus, standing right in front of you.",
+    "Picture the {B} sitting in the middle of the room, glowing bright orange.",
+    "Imagine the {B} the size of a house, blocking the doorway.",
 ]
 
+# "it" is the image from the sentence before.
 LINKS = [
-    "Then the {a} slams into {B} with a loud crash.",
-    "Suddenly the {a} explodes, and out jumps {B}.",
-    "The {a} is stuck to {B} with huge strips of sticky tape.",
-    "{B_cap} is chasing the {a} around the room.",
-    "The {a} is wearing {B} like a hat.",
-    "Someone is hitting the {a} with {B}.",
-    "Out of the {a} pours {B}, dripping wet.",
-    "{B_cap} is balancing on top of the {a}.",
-    "The {a} starts singing to {B}, very loudly.",
-    "The {a} catches fire, and {B} tries to put it out.",
-    "The {a} is being eaten by {B}.",
-    "{B_cap} slides down the {a} like a slide.",
+    "Then it slams into the {B} with a loud crash.",
+    "Suddenly it explodes, and out jumps the {B}.",
+    "It is stuck to the {B} with huge strips of sticky tape.",
+    "The {B} is chasing it around the room.",
+    "It is wearing the {B} like a hat.",
+    "Someone is hitting it with the {B}.",
+    "Out of it pours the {B}, dripping wet.",
+    "The {B} is balancing on top of it.",
+    "It starts singing to the {B}, very loudly.",
+    "It catches fire, and the {B} tries to put it out.",
+    "It is being eaten by the {B}.",
+    "The {B} slides down it like a slide.",
+    "It swallows the {B} whole, and starts to hiccup.",
+    "It tows the {B} down the street.",
+    "The {B} wraps around it and squeezes tight.",
+    "It paints the {B} bright green.",
 ]
 
 
@@ -302,16 +309,8 @@ def build_story(words, digits_list=None, variant=0):
     links = LINKS[:]
     rng.shuffle(links)
 
-    def fill(template, prev, w, d):
-        marked = _mark(w, d)
-        return template.format(
-            a=prev,
-            B=f"{_art(w).split(' ')[0]} {marked}",
-            B_cap=f"{_art(w).split(' ')[0].capitalize()} {marked}",
-        )
-
-    sentences = [fill(rng.choice(OPENERS), "", words[0], digits_list[0])]
+    sentences = [rng.choice(OPENERS).format(B=_mark(words[0], digits_list[0]))]
     for k in range(1, len(words)):
         template = links[(k - 1) % len(links)]
-        sentences.append(fill(template, words[k - 1], words[k], digits_list[k]))
+        sentences.append(template.format(B=_mark(words[k], digits_list[k])))
     return sentences

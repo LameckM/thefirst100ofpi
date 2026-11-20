@@ -66,6 +66,8 @@ Some digit groups (like 399) have no single dictionary word. When a group of 3 o
 ## Main experiences
 
 - **Create:** encode a number, choose 2–4 digits per word, swap alternative images, regenerate the story and copy the result.
+- **Your own story:** write text before, between and after your images. The images stay locked in order. Start from the suggested story, edit freely, and your text is saved in the browser per number. Swapping a word keeps your text and flags the spot to recheck.
+- **History:** save a story with a title, then find, search, rename, copy, reopen or delete it on the History tab. Everything is stored in the browser only (no account), so clearing site data removes it.
 - **Learn:** understand the Major System sound map, learn the rules and decode a word sound by sound.
 - **Practice:** complete 10-question rounds across sound, digit, word and number exercises at easy or medium difficulty.
 
