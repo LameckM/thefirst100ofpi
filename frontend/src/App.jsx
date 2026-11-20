@@ -66,6 +66,83 @@ function Palace({chunks}) {
   {chunks.length>0&&(missing>0?<p className="palace-warn">Your number has {chunks.length} images but you have {stops.length} stops. Add {missing} more to place them all.</p>:stops.length>0&&<p className="palace-ok">Every image has a place. Walk the route a few times, seeing each scene.</p>)}
  </div>;
 }
+const OWN_KEY="number-stories-own-stories";
+function loadOwn(){try{const v=JSON.parse(localStorage.getItem(OWN_KEY)||"{}");return v&&typeof v==="object"&&!Array.isArray(v)?v:{};}catch{return {};}}
+function saveOwn(key,entry){
+ try{
+  const all=loadOwn();
+  if(entry)all[key]=entry;else delete all[key];
+  const next={};
+  Object.keys(all).sort((a,b)=>(all[b].at||0)-(all[a].at||0)).slice(0,60).forEach(k=>{next[k]=all[k];});
+  localStorage.setItem(OWN_KEY,JSON.stringify(next));
+ }catch{}
+}
+// Text can sit before every image and after the last one. slots[i] is the text right before image i; slots[n] is the ending.
+function suggestedSlots(sentences,chunks){
+ const text=(sentences||[]).join(" ");
+ const re=/\[\[([^\]|]+)\|?[^\]]*\]\]/g;
+ const pieces=[];let last=0,m;
+ while((m=re.exec(text))!==null){pieces.push(text.slice(last,m.index).trim());last=m.index+m[0].length;}
+ pieces.push(text.slice(last).trim());
+ const slots=Array(chunks.length+1).fill("");
+ let k=0;
+ chunks.forEach((c,i)=>{if(c.word)slots[i]=pieces[k++]||"";});
+ slots[chunks.length]=pieces[k]||"";
+ return slots;
+}
+function weave(slots,chunks){
+ const out=[];let plain="";
+ const add=(type,value,digits)=>{
+  const v=(value||"").trim();if(!v)return;
+  const space=plain&&!/^[,.;:!?)'’]/.test(v)&&!/[(\s]$/.test(plain);
+  plain+=(space?" ":"")+v;
+  out.push({type,value:v,digits,space:!!space});
+ };
+ chunks.forEach((c,i)=>{add("text",slots[i]);if(c.word)add("word",c.word,c.digits);});
+ add("text",slots[chunks.length]);
+ return {parts:out,plain};
+}
+function Slot({value,onChange,placeholder,label}) {
+ const ref=useRef(null);
+ useEffect(()=>{const el=ref.current;if(el){el.style.height="auto";el.style.height=el.scrollHeight+"px";}},[value]);
+ return <textarea ref={ref} className="own-slot" rows={1} value={value} maxLength={600} placeholder={placeholder} aria-label={label} onChange={e=>onChange(e.target.value)}/>;
+}
+function OwnStory({chunks,suggested,grouped}) {
+ const n=chunks.length;
+ const [slots,setSlots]=useState(()=>{const e=loadOwn()[grouped];const s=e&&Array.isArray(e.slots)?e.slots:[];return Array.from({length:n+1},(_,i)=>typeof s[i]==="string"?s[i]:"");});
+ const [snap,setSnap]=useState(()=>{const e=loadOwn()[grouped];return e&&Array.isArray(e.words)&&e.words.length===n?e.words:chunks.map(c=>c.word);});
+ const [copied,setCopied]=useState(false);
+ const hasText=slots.some(x=>x.trim());
+ useEffect(()=>{saveOwn(grouped,hasText?{slots,words:snap,at:Date.now()}:null);},[slots,snap]);
+ useEffect(()=>{if(!hasText)setSnap(chunks.map(c=>c.word));},[chunks,hasText]);
+ const setSlot=(i,v)=>setSlots(a=>a.map((x,k)=>k===i?v:x));
+ const changed=i=>snap[i]&&chunks[i].word&&snap[i]!==chunks[i].word&&((slots[i]||"").trim()||(slots[i+1]||"").trim());
+ const {parts,plain}=weave(slots,chunks);
+ function useSuggested(){
+  if(hasText&&!confirm("Replace what you wrote with the suggested story?"))return;
+  setSlots(suggestedSlots(suggested,chunks));setSnap(chunks.map(c=>c.word));
+ }
+ function clearAll(){if(confirm("Clear everything you wrote for this number?"))setSlots(Array(n+1).fill(""));}
+ async function copy(){
+  try{await navigator.clipboard.writeText(grouped+"\n\n"+chunks.map(c=>c.digits+" = "+c.word).join("\n")+"\n\n"+plain);setCopied(true);setTimeout(()=>setCopied(false),1500);}catch{}
+ }
+ return <div className="input-panel own-story">
+  <div className="result-head"><div><span className="eyebrow">04 / WRITE IT YOURSELF</span><h2>Your own story</h2><p>Your images stay in order. Write anything you like before, between and after them. Stories you invent yourself are the ones you remember.</p></div>
+   <Button kind="secondary" onClick={useSuggested} disabled={!suggested||!suggested.length}>Start from the suggested story</Button></div>
+  <div className="own-flow">
+   {chunks.map((c,i)=><div key={i}>
+    <Slot value={slots[i]||""} onChange={v=>setSlot(i,v)} label={"Your text before scene "+(i+1)} placeholder={i===0?"How does your story begin? (optional)":"What happens between "+(chunks[i-1].word||chunks[i-1].digits)+" and "+(c.word||c.digits)+"? (optional)"}/>
+    {c.word?<div className="own-chip"><mark>{c.word}</mark><span className="own-digits">{c.digits}</span><small>scene {String(i+1).padStart(2,"0")} · locked in place</small></div>
+     :<div className="own-chip empty"><span>No word for {c.digits} yet</span><small>scene {String(i+1).padStart(2,"0")} · add a word in its card above</small></div>}
+    {changed(i)&&<p className="own-note">You swapped “{snap[i]}” for “{c.word}”. Check your sentences still fit. <button type="button" onClick={()=>setSnap(a=>a.map((w,k)=>k===i?c.word:w))}>Dismiss</button></p>}
+   </div>)}
+   <Slot value={slots[n]||""} onChange={v=>setSlot(n,v)} label="Your text after the last scene" placeholder="How does it end? (optional)"/>
+  </div>
+  {hasText&&<div className="own-preview"><span className="eyebrow">Your story so far</span>
+   <p className="story-line">{parts.map((p,i)=><span key={i}>{p.space&&" "}{p.type==="word"?<mark title={p.digits}>{p.value}</mark>:p.value}</span>)}</p>
+   <div className="own-actions"><Button kind="secondary" onClick={copy}>{copied?"Copied":"Copy my story"}</Button><Button kind="quiet" onClick={clearAll}>Clear my text</Button></div></div>}
+ </div>;
+}
 function Button({children,kind="primary",...props}) { return <button className={"button "+kind} {...props}>{children}</button>; }
 
 export default function App() {
@@ -195,6 +272,7 @@ export default function App() {
      <div className="story-panel"><div className="result-head"><div><span className="eyebrow">03 / CONNECT THE SCENES</span><h2>Your story</h2></div><Button kind="secondary" onClick={()=>navigator.clipboard.writeText(result.grouped+"\n\n"+result.chunks.map(c=>c.digits+" = "+c.word).join("\n")+"\n\n"+result.story.map(s=>s.replace(/\[\[([^\]|]+)\|?[^\]]*\]\]/g,"$1")).join(" "))}>Copy story</Button></div>{result.story.map((s,i)=><p className="story-line" key={i}>{s.split(/(\[\[[^\]]+\]\])/g).map((part,j)=>part.startsWith("[[")?<mark key={j}>{part.match(/\[\[([^\]|]+)/)?.[1]}</mark>:part)}</p>)}<small className="hint">Make each scene unusual, oversized and full of movement. The stranger it feels, the easier it is to recall.</small></div>
     </section>}
     {!result&&<div className="starter"><h2>From abstract digits to unforgettable scenes.</h2><p><b>01 Encode</b> — digits become consonant sounds and words.</p><p><b>02 Visualise</b> — choose images that feel clear and personal.</p><p><b>03 Connect</b> — link each image into one memorable story.</p></div>}
+    {result&&<OwnStory key={result.grouped} chunks={result.chunks} suggested={result.story} grouped={result.grouped}/>}
     <Palace chunks={result?result.chunks:[]}/>
     <div className="input-panel personal-library"><div className="result-head"><div><span className="eyebrow">YOUR CUSTOM VOCABULARY</span><h2>Personal Word Library</h2><p>Words you save are preferred whenever the same number group appears again.</p></div><Button kind="secondary" onClick={loadLibrary}>{libraryOpen?"Refresh library":"View saved words"}</Button></div>{libraryOpen&&<div className="library-list">{library.length?library.map((item,i)=><div className="library-item" key={item.word+"-"+item.digits}><span><b>{item.word}</b><small>{item.digits}</small></span><button onClick={()=>removeLibraryWord(item.word,item.digits)}>Remove</button></div>):<p className="hint">No personal words saved yet. Add one to a number group above.</p>}</div>}</div>
     <div className="callout"><span>NEW TO THIS TECHNIQUE?</span><p>Learn the simple sound code behind every number.</p><Button kind="secondary" onClick={()=>go("learn")}>Explore the method ↗</Button></div>

@@ -74,7 +74,7 @@ label{display:block;font-weight:700;margin:12px 0 8px}
 .input-row input:focus-visible{outline:0;border-bottom-color:var(--biro);box-shadow:0 3px 0 var(--biro)}
 
 /* buttons */
-.button{min-height:48px;padding:10px 20px;border:2px solid var(--edge);border-radius:8px;font-weight:700;transition:transform .12s,background .12s}
+.button{min-height:48px;padding:10px 20px;border:2px solid var(--edge);border-radius:8px;font-weight:700;transition:transform .12s,background .12s,color .12s}
 .button:hover{transform:translate(-1px,-1px)}
 .button:disabled{opacity:.55;cursor:wait;transform:none}
 .button.primary{background:var(--biro);border-color:var(--biro);color:var(--on-biro)}
@@ -109,7 +109,7 @@ label{display:block;font-weight:700;margin:12px 0 8px}
 .personal-word-form{border-top:2px dotted var(--line);margin-top:14px;padding-top:6px}
 .personal-word-form label{font-size:14px;color:var(--soft);margin:6px 0}
 .personal-word-form .input-row{flex-wrap:wrap}
-.personal-word-form input{font-size:17px;letter-spacing:0}
+.personal-word-form input{font-size:17px;letter-spacing:0;flex:1 1 100%}
 .personal-word-form .button{min-height:44px;white-space:nowrap}
 .personal-message{display:block;margin-top:8px;color:var(--go);font-size:14px;font-weight:600}
 
@@ -204,6 +204,21 @@ mark{background:var(--hl);background-size:100% 1.2em;background-position:center;
 .palace-warn{color:var(--no);font-weight:600;margin:16px 0 0}
 .palace-ok{color:var(--go);font-weight:600;margin:16px 0 0}
 @media(max-width:720px){.route li{flex-wrap:wrap}.stop-body{flex:1 1 calc(100% - 52px)}.stop-actions{flex:0 0 100%;margin-left:48px}.palace .result-head .button{padding-left:0}}
+.own-story .result-head p{color:var(--soft);margin:4px 0 14px;font-size:15px;max-width:58ch}
+.own-flow{display:grid;gap:2px;margin-top:6px}
+.own-slot{display:block;width:100%;min-height:46px;padding:8px 2px;border:0;border-bottom:2px dotted var(--line);border-radius:0;background:transparent;resize:none;overflow:hidden;font:400 19px/1.6 var(--serif);color:var(--ink)}
+.own-slot::placeholder{color:var(--soft);opacity:.7;font:400 15px var(--sans)}
+.own-slot:focus-visible{outline:0;border-bottom:2px solid var(--biro)}
+.own-chip{display:flex;align-items:center;flex-wrap:wrap;gap:4px 12px;padding:10px 0 6px}
+.own-chip mark{font:400 28px/1.2 var(--serif);padding:0 .25em}
+.own-digits{font:400 18px var(--serif);font-variant-numeric:lining-nums;color:var(--biro)}
+.own-chip small{color:var(--soft);font-size:13px;font-weight:600}
+.own-chip.empty span{color:var(--soft);font:400 20px var(--serif);border:2px dashed var(--line);border-radius:8px;padding:2px 12px}
+.own-note{margin:4px 0 8px;padding:8px 12px;border-left:4px solid var(--no);background:var(--no-bg);color:var(--no);border-radius:4px;font-size:14px;font-weight:600}
+.own-note button{border:0;background:none;color:inherit;font-weight:700;text-decoration:underline;padding:0 0 0 6px}
+.own-preview{margin-top:22px;border-top:2px dotted var(--line);padding-top:14px}
+.own-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:6px}
+@media(max-width:720px){.own-story .result-head .button{width:100%}.own-chip mark{font-size:24px}}
 footer{display:flex;align-items:center;gap:12px;padding:22px max(5vw,20px);border-top:2px solid var(--edge);color:var(--soft);font-size:14px}
 footer b{color:var(--ink);font-weight:700}
 footer>span:last-child{margin-left:auto}
