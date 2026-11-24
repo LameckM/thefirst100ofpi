@@ -15,6 +15,22 @@ async function api(path, options) {
  return data;
 }
 const SCORE_KEY="number-stories-scores";
+const REVIEW_KEY="number-stories-review";
+function loadReviews(){
+ try{
+  const value=JSON.parse(localStorage.getItem(REVIEW_KEY)||"[]");
+  return Array.isArray(value)?value.filter(x=>x&&typeof x.id==="string"&&typeof x.digits==="string"&&typeof x.word==="string"&&Number.isFinite(x.dueAt)):[];
+ }catch{return [];}
+}
+function persistReviews(items){try{localStorage.setItem(REVIEW_KEY,JSON.stringify(items));return true;}catch{return false;}}
+function reviewDueLabel(item){
+ const remaining=item.dueAt-Date.now();
+ if(remaining<=0)return "Due now";
+ if(remaining<60*60*1000)return "Due in "+Math.ceil(remaining/60000)+" min";
+ const hours=remaining/(60*60*1000);
+ if(hours<24)return "Due in "+Math.ceil(hours)+" hr";
+ return "Due "+new Date(item.dueAt).toLocaleDateString(undefined,{day:"numeric",month:"short"});
+}
 const KIND_LABEL={mix:"Everything",sounds:"Digit to sounds",digit:"Sound to digit",word:"Word to number",number:"Number to word"};
 function loadScores(){try{const v=JSON.parse(localStorage.getItem(SCORE_KEY)||"[]");return Array.isArray(v)?v:[];}catch{return [];}}
 function saveScores(list){try{localStorage.setItem(SCORE_KEY,JSON.stringify(list));}catch{}}
@@ -210,6 +226,30 @@ function History({items,onOpen,onRename,onDelete,onCreate}) {
   {needle&&!shown.length&&<p className="hint">No stories match “{q}”.</p>}
  </>;
 }
+function Review({items,revealed,onReveal,onRate,onCreate}) {
+ const now=Date.now();
+ const due=items.filter(item=>item.dueAt<=now).sort((a,b)=>a.dueAt-b.dueAt);
+ const upcoming=items.filter(item=>item.dueAt>now).sort((a,b)=>a.dueAt-b.dueAt);
+ return <section>
+  <div className="hero"><span className="eyebrow">YOUR MEMORY ROUTINE</span><h1>Review what <em>matters.</em></h1><p>Short reviews at the right time help move your number stories into long-term memory.</p></div>
+  <div className="review-stats">
+   <div><b>{due.length}</b><span>Ready to review</span></div>
+   <div><b>{upcoming.length}</b><span>Scheduled for later</span></div>
+   <div><b>{items.length}</b><span>Scenes tracked</span></div>
+  </div>
+  {!items.length&&<div className="input-panel review-empty"><h2>Your review list is empty</h2><p className="hint">Create a number story, practise recall, reveal each scene and rate how well you remembered it. Your scenes will be scheduled here automatically.</p><Button onClick={onCreate}>Create a number story ↗</Button></div>}
+  {due.length>0&&<><div className="review-section-head"><div><span className="eyebrow">READY WHEN YOU ARE</span><h2>Due for review</h2></div><span className="review-count">{due.length} {due.length===1?"scene":"scenes"}</span></div>
+   <div className="review-list">{due.map(item=>{const open=revealed.includes(item.id);return <article className="input-panel review-card" key={item.id}>
+    <div className="review-card-head"><span className="eyebrow">{item.grouped||"NUMBER STORY"}</span><span className="review-due">Due now</span></div>
+    <p className="review-digits">{item.digits}</p><h3>{open?item.word:"••••••"}</h3>
+    <p className="hint">{open?"Did you remember this image?":"Recall the word and picture for this number group before revealing the answer."}</p>
+    {!open?<Button kind="secondary" onClick={()=>onReveal(item.id)}>Reveal answer</Button>:<div className="review-rating"><button type="button" onClick={()=>onRate(item.id,"forgot")}>↻ I forgot</button><button type="button" onClick={()=>onRate(item.id,"remembered")}>✓ I remembered</button></div>}
+   </article>;})}</div>
+  </>}
+  {items.length>0&&due.length===0&&<div className="input-panel review-empty"><h2>You're all caught up.</h2><p className="hint">There are no scenes due right now. Come back when the next review is scheduled.</p></div>}
+  {upcoming.length>0&&<div className="review-upcoming"><div className="review-section-head"><div><span className="eyebrow">COMING UP</span><h2>Scheduled scenes</h2></div></div>{upcoming.map(item=><div className="review-upcoming-item" key={item.id}><span><b>{item.digits}</b><small>{item.grouped||item.word}</small></span><span>{reviewDueLabel(item)}</span></div>)}</div>}
+ </section>;
+}
 function Button({children,kind="primary",...props}) { return <button className={"button "+kind} {...props}>{children}</button>; }
 
 export default function App() {
@@ -242,9 +282,54 @@ export default function App() {
  const [recallMode,setRecallMode]=useState(false);
  const [revealedScenes,setRevealedScenes]=useState([]);
  const [recallRatings,setRecallRatings]=useState({});
- const [recallQueue,setRecallQueue]=useState(null);
+ const [recallQueue,setRecallQueue]=useState(null);\n const [reviews,setReviews]=useState(loadReviews);\n const [revealedReviews,setRevealedReviews]=useState([]);
  const savedRound=useRef(null);
 
+ function scheduleSceneReview(index,rating) {
+  if(!result?.chunks[index]?.word)return;
+  const chunk=result.chunks[index];
+  const id=result.grouped+":"+index;
+  const now=Date.now();
+  setReviews(current=>{
+   const previous=current.find(item=>item.id===id);
+   let intervalDays=0,repetitions=0,dueAt;
+   if(rating==="remembered"){
+    const intervals=[1,3,7,14,30];
+    intervalDays=previous?intervals[Math.min(intervals.indexOf(previous.intervalDays)+1,intervals.length-1)]:1;
+    if(intervalDays<1)intervalDays=1;
+    repetitions=(previous?.repetitions||0)+1;
+    dueAt=now+intervalDays*24*60*60*1000;
+   }else{
+    intervalDays=0;
+    repetitions=0;
+    dueAt=now+10*60*1000;
+   }
+   const entry={id,grouped:result.grouped,number:result.digits||number,digits:chunk.digits,word:chunk.word,intervalDays,repetitions,lastReviewedAt:now,dueAt,createdAt:previous?.createdAt||now};
+   const next=[entry,...current.filter(item=>item.id!==id)].sort((a,b)=>a.dueAt-b.dueAt);
+   persistReviews(next);
+   return next;
+  });
+ }
+ function rateRecall(index,rating) {
+  setRecallRatings(current=>({...current,[index]:rating}));
+  scheduleSceneReview(index,rating);
+ }
+ function rateReview(id,rating) {
+  setReviews(current=>{
+   const now=Date.now();
+   const next=current.map(item=>{
+    if(item.id!==id)return item;
+    if(rating==="forgot")return {...item,intervalDays:0,repetitions:0,lastReviewedAt:now,dueAt:now+10*60*1000};
+    const intervals=[1,3,7,14,30];
+    const position=intervals.indexOf(item.intervalDays);
+    const intervalDays=position<0?1:intervals[Math.min(position+1,intervals.length-1)];
+    return {...item,intervalDays,repetitions:(item.repetitions||0)+1,lastReviewedAt:now,dueAt:now+intervalDays*24*60*60*1000};
+   });
+   persistReviews(next);
+   return next;
+  });
+  setRevealedReviews(current=>current.filter(value=>value!==id));
+ }
  function go(next) {
   setView(next); history.replaceState(null,"",location.pathname+location.search+"#"+next);
   window.scrollTo({top:0,behavior:"smooth"});
@@ -376,7 +461,7 @@ export default function App() {
  return <div className="shell">
   <header className="topbar">
    <button className="brand" onClick={()=>go("create")}><span className="brand-icon">N<span>.</span></span><span>number stories<small>MAKE NUMBERS MEMORABLE</small></span></button>
-   <nav>{["create","learn","practice","history"].map(v=><button key={v} className={view===v?"active":""} onClick={()=>go(v)}>{v[0].toUpperCase()+v.slice(1)}</button>)}</nav>
+   <nav>{["create","learn","practice","review","history"].map(v=><button key={v} className={view===v?"active":""} onClick={()=>go(v)}>{v[0].toUpperCase()+v.slice(1)}</button>)}</nav>
    <div className="header-actions"><button className="theme-toggle" onClick={()=>setTheme(v=>v==="light"?"dark":"light")} aria-label={"Switch to "+(theme==="light"?"dark":"light")+" mode"} title={"Switch to "+(theme==="light"?"dark":"light")+" mode"}><span aria-hidden="true">{theme==="light"?"☾":"☀"}</span><span>{theme==="light"?"Dark mode":"Light mode"}</span></button><span className="top-note">THE MAJOR SYSTEM <i/></span></div>
   </header>
   <main>
@@ -386,7 +471,7 @@ export default function App() {
     <div className="input-panel"><div className="panel-label"><span>01 / NUMBER INPUT</span><span>UP TO 300 DIGITS</span></div><form onSubmit={e=>{e.preventDefault();create();}}><label htmlFor="number">What do you want to remember?</label><div className="input-row"><input id="number" value={number} onChange={e=>setNumber(e.target.value)} inputMode="numeric" placeholder="Try 314159265358979..."/><Button disabled={busy}>{busy?"Building...":"Create story ↗"}</Button></div></form><div className="target-row"><span>Words should represent</span>{[2,3,4].map(n=><button key={n} className={target===n?"chosen":""} onClick={()=>{setTarget(n);if(result)create(n);}}>{n} digits</button>)}</div></div>
     {result&&<section className="results"><div className="result-head"><div><span className="eyebrow">02 / YOUR MEMORY MAP</span><h2>{result.chunks.length} images for your number</h2><p className="digits">{result.grouped}</p></div><div className="storyboard-actions"><Button kind="secondary" onClick={()=>{setRecallMode(v=>!v);setRevealedScenes([]);setRecallRatings({});setRecallQueue(null);}}>{recallMode?"Exit recall mode":"Practice recall ↗"}</Button><Button kind="quiet" onClick={async()=>{try{const r=await story(result.chunks.map(c=>c.word),result.chunks.map(c=>c.digits),Date.now());setResult(v=>({...v,story:r.story}));}catch(e){setError(e.message);}}}>↻ Another story</Button></div></div>{recallMode&&<div className="recall-instructions"><b>Recall mode</b><span>Use each number group as a cue. Picture the scene, say the word aloud, then reveal it to check your memory.</span></div>}
      <div className="storyboard" aria-label="Number story scenes"><div className="storyboard-track" aria-hidden="true"><span style={{width:((selectedScene+1)/Math.max(result.chunks.length,1))*100+"%"}}/></div><div className="word-grid">{result.chunks.map((c,i)=><article className={"word-card scene-card"+(selectedScene===i?" selected":"")} key={i}><button type="button" className="scene-select" aria-pressed={selectedScene===i} onClick={()=>setSelectedScene(i)}><span className="word-meta"><span>SCENE {String(i+1).padStart(2,"0")}</span><span>{c.digits}</span></span><h3>{recallMode&&!revealedScenes.includes(i)?"••••••":(c.word || "Choose a word")}</h3><span className="scene-hint">{selectedScene===i?"Viewing this scene":"Explore scene ↗"}</span></button>{!recallMode&&c.hints&&c.hints[c.word]&&<small className="hint">{c.hints[c.word]}</small>}{!recallMode&&!c.word&&<small className="hint">No dictionary match for this group yet</small>}{!recallMode&&<><div className="alternatives"><small>SWAP IMAGE</small>{(c.alternatives||[]).filter(w=>w!==c.word).slice(0,c.expanded?40:4).map(w=><button key={w} onClick={()=>swap(i,w)}>{w}</button>)}{c.word&&!c.expanded&&<button className="more" onClick={()=>more(i)}>More +</button>}{!c.word&&<small>Word not assigned</small>}</div><form className="personal-word-form" onSubmit={e=>saveCustomWord(e,c.digits)}><label htmlFor={"custom-"+i}>Add your own word for {c.digits}</label><small className="hint">Words outside the dictionary can still be saved. You confirm their sound-to-number mapping.</small><div className="input-row"><input id={"custom-"+i} value={customWords[c.digits]||""} onChange={e=>setCustomWords(v=>({...v,[c.digits]:e.target.value}))} placeholder="Type a word..."/><Button kind="secondary">Save word</Button></div>{customMessages[c.digits]&&<small className="personal-message">{customMessages[c.digits]}</small>}</form></>}</article>)}</div></div>
-     <div className="scene-focus" aria-live="polite"><div><span className="eyebrow">SCENE {String(selectedScene+1).padStart(2,"0")} OF {String(result.chunks.length).padStart(2,"0")}</span><h3>{recallMode&&!revealedScenes.includes(selectedScene)?"What image represents this group?":(result.chunks[selectedScene]?.word||"Choose an image")}</h3><p><b>{result.chunks[selectedScene]?.digits}</b> — {recallMode&&!revealedScenes.includes(selectedScene)?"Try to recall the word and picture before revealing the answer.":"Picture "+(result.chunks[selectedScene]?.word?article(result.chunks[selectedScene].word)+" "+result.chunks[selectedScene].word:"a vivid image")+" as something oversized, unusual and full of movement."}</p>{recallMode&&<><button type="button" className="button secondary reveal-scene" onClick={()=>setRevealedScenes(v=>v.includes(selectedScene)?v.filter(i=>i!==selectedScene):[...v,selectedScene])}>{revealedScenes.includes(selectedScene)?"Hide answer":"Reveal answer"}</button>{revealedScenes.includes(selectedScene)&&<div className="recall-rating"><span>Did you remember this image?</span><div><button type="button" className={recallRatings[selectedScene]==="remembered"?"chosen":""} onClick={()=>setRecallRatings(v=>({...v,[selectedScene]:"remembered"}))}>✓ I remembered</button><button type="button" className={recallRatings[selectedScene]==="forgot"?"chosen":""} onClick={()=>setRecallRatings(v=>({...v,[selectedScene]:"forgot"}))}>↻ I forgot</button></div></div>}</>}</div><div className="scene-controls"><button type="button" className="button secondary" disabled={selectedScene===0} onClick={()=>setSelectedScene(i=>Math.max(0,i-1))}>← Previous</button><button type="button" className="button primary" disabled={selectedScene>=result.chunks.length-1} onClick={()=>setSelectedScene(i=>Math.min(result.chunks.length-1,i+1))}>Next scene →</button></div></div>
+     <div className="scene-focus" aria-live="polite"><div><span className="eyebrow">SCENE {String(selectedScene+1).padStart(2,"0")} OF {String(result.chunks.length).padStart(2,"0")}</span><h3>{recallMode&&!revealedScenes.includes(selectedScene)?"What image represents this group?":(result.chunks[selectedScene]?.word||"Choose an image")}</h3><p><b>{result.chunks[selectedScene]?.digits}</b> — {recallMode&&!revealedScenes.includes(selectedScene)?"Try to recall the word and picture before revealing the answer.":"Picture "+(result.chunks[selectedScene]?.word?article(result.chunks[selectedScene].word)+" "+result.chunks[selectedScene].word:"a vivid image")+" as something oversized, unusual and full of movement."}</p>{recallMode&&<><button type="button" className="button secondary reveal-scene" onClick={()=>setRevealedScenes(v=>v.includes(selectedScene)?v.filter(i=>i!==selectedScene):[...v,selectedScene])}>{revealedScenes.includes(selectedScene)?"Hide answer":"Reveal answer"}</button>{revealedScenes.includes(selectedScene)&&<div className="recall-rating"><span>Did you remember this image?</span><div><button type="button" className={recallRatings[selectedScene]==="remembered"?"chosen":""} onClick={()=>rateRecall(selectedScene,"remembered")}>✓ I remembered</button><button type="button" className={recallRatings[selectedScene]==="forgot"?"chosen":""} onClick={()=>rateRecall(selectedScene,"forgot")}>↻ I forgot</button></div></div>}</>}</div><div className="scene-controls"><button type="button" className="button secondary" disabled={selectedScene===0} onClick={()=>setSelectedScene(i=>Math.max(0,i-1))}>← Previous</button><button type="button" className="button primary" disabled={selectedScene>=result.chunks.length-1} onClick={()=>setSelectedScene(i=>Math.min(result.chunks.length-1,i+1))}>Next scene →</button></div></div>
      {recallComplete&&<div className="input-panel recall-summary"><span className="eyebrow">RECALL SESSION COMPLETE</span><h2>{recallRemembered.length} of {activeRecallScenes.length} remembered</h2><div className="recall-score">{Math.round((recallRemembered.length/activeRecallScenes.length)*100)}%</div><p>{recallMissed.length?recallMissed.length+" scene"+(recallMissed.length===1?" was":"s were")+" difficult. Review them and try again.":"Excellent work — you recalled every scene."}</p>{recallMissed.length>0&&<Button onClick={()=>{setRecallQueue(recallMissed);setRecallRatings(v=>{const next={...v};recallMissed.forEach(i=>delete next[i]);return next;});setRevealedScenes(v=>v.filter(i=>!recallMissed.includes(i)));setSelectedScene(recallMissed[0]);}}>Retry forgotten scenes ↗</Button>}</div>}
       {!recallMode&&<div className="story-panel"><div className="result-head"><div><span className="eyebrow">03 / CONNECT THE SCENES</span><h2>Your story</h2></div><Button kind="secondary" onClick={()=>navigator.clipboard.writeText(result.grouped+"\n\n"+result.chunks.map(c=>c.digits+" = "+c.word).join("\n")+"\n\n"+result.story.map(s=>s.replace(/\[\[([^\]|]+)\|?[^\]]*\]\]/g,"$1")).join(" "))}>Copy story</Button></div>{result.story.map((s,i)=><p className="story-line" key={i}>{s.split(/(\[\[[^\]]+\]\])/g).map((part,j)=>part.startsWith("[[")?<mark key={j}>{part.match(/\[\[([^\]|]+)/)?.[1]}</mark>:part)}</p>)}<small className="hint">Make each scene unusual, oversized and full of movement. The stranger it feels, the easier it is to recall.</small></div>}
     </section>}
@@ -396,7 +481,7 @@ export default function App() {
     <div className="input-panel personal-library"><div className="result-head"><div><span className="eyebrow">YOUR CUSTOM VOCABULARY</span><h2>Personal Word Library</h2><p>Words you save are preferred whenever the same number group appears again.</p></div><Button kind="secondary" onClick={loadLibrary}>{libraryOpen?"Refresh library":"View saved words"}</Button></div>{libraryOpen&&<div className="library-list">{library.length?library.map((item,i)=><div className="library-item" key={item.word+"-"+item.digits}><span><b>{item.word}</b><small>{item.digits}</small></span><button onClick={()=>removeLibraryWord(item.word,item.digits)}>Remove</button></div>):<p className="hint">No personal words saved yet. Add one to a number group above.</p>}</div>}</div>
     <div className="callout"><span>NEW TO THIS TECHNIQUE?</span><p>Learn the simple sound code behind every number.</p><Button kind="secondary" onClick={()=>go("learn")}>Explore the method ↗</Button></div>
    </section>}
-   {view==="history"&&<section><div className="hero"><span className="eyebrow">YOUR LIBRARY</span><h1>Your saved <em>stories.</em></h1><p>Every story you save lives here. Open one to keep working on it, or read it again to recall the number.</p></div><History items={history} onOpen={openSaved} onRename={renameStory} onDelete={deleteStory} onCreate={()=>go("create")}/></section>}
+   {view==="review"&&<Review items={reviews} revealed={revealedReviews} onReveal={id=>setRevealedReviews(current=>current.includes(id)?current.filter(value=>value!==id):[...current,id])} onRate={rateReview} onCreate={()=>go("create")}/> }\n   {view==="history"&&<section><div className="hero"><span className="eyebrow">YOUR LIBRARY</span><h1>Your saved <em>stories.</em></h1><p>Every story you save lives here. Open one to keep working on it, or read it again to recall the number.</p></div><History items={history} onOpen={openSaved} onRename={renameStory} onDelete={deleteStory} onCreate={()=>go("create")}/></section>}
    {view==="learn"&&<section><div className="hero"><span className="eyebrow">THE METHOD</span><h1>Learn the <em>Major System.</em></h1><p>A sound-based code that turns hard-to-recall numbers into words, pictures and stories.</p></div><div className="lesson"><span className="eyebrow">01 / THE BIG IDEA</span><h2>Your brain remembers pictures better than digits.</h2><p>Each digit maps to a consonant sound. Add vowels to make a word, turn that word into a mental image, and connect images in sequence.</p></div><div className="input-panel"><span className="eyebrow">02 / THE SOUND CODE</span><h2>Ten digits. Ten sound groups.</h2><div className="digit-grid">{MAP.map(([d,s,h,w])=><article key={d}><b>{d}</b><div><strong>{s}</strong><p>{h}</p><small>EXAMPLE · {w}</small></div></article>)}</div></div><div className="lesson"><span className="eyebrow">03 / FOUR RULES</span><h2>Sound matters. Spelling doesn't.</h2><ul><li><b>Ignore vowels, H, W and Y.</b> They help form words but carry no digits.</li><li><b>Listen for consonant sounds.</b> Phone begins with an F sound, so it maps to 8.</li><li><b>One sound, one digit.</b> A double letter making one sound counts once.</li><li><b>Letters can change sound.</b> Soft C sounds like S; hard C sounds like K.</li></ul></div><div className="input-panel"><span className="eyebrow">04 / TRY IT YOURSELF</span><h2>Decode any word.</h2><form className="input-row" onSubmit={e=>{e.preventDefault();decode();}}><input value={word} onChange={e=>setWord(e.target.value)} placeholder="Try phone..." aria-label="Word to decode"/><Button>Decode word</Button></form>{decoded&&(!decoded.found?<p>Word not found. Try another.</p>:decoded.options.map((o,i)=><p key={i} className="decode-line">{o.steps.map(s=>s.sound+" = "+s.digit).join(" · ")} <b>→ {o.digits||"no digits"}</b></p>))}</div><Button onClick={()=>go("practice")}>I'm ready to practise ↗</Button></section>}
    {view==="practice"&&<section><div className="hero"><span className="eyebrow">BUILD RECALL</span><h1>Train your <em>memory.</em></h1><p>Short, focused rounds help you learn the sound code until it becomes automatic.</p></div>{!round&&<div className="input-panel"><h2>Set up a practice round</h2><label>Question type</label><div className="target-row wrap">{[["mix","Everything"],["sounds","Digit to sounds"],["digit","Sound to digit"],["word","Word to number"],["number","Number to word"]].map(([v,l])=><button key={v} className={kind===v?"chosen":""} onClick={()=>setKind(v)}>{l}</button>)}</div><label>Difficulty</label><div className="target-row"><button className={level==="easy"?"chosen":""} onClick={()=>setLevel("easy")}>Easy</button><button className={level==="medium"?"chosen":""} onClick={()=>setLevel("medium")}>Medium</button></div><p className="hint">Easy uses 1–2 digit numbers. Medium uses 3-digit numbers and trickier spellings.</p><Button onClick={start}>Start 10-question round ↗</Button></div>}
     {!round&&<div className="input-panel"><h2>Your progress</h2><Progress scores={scores} onClear={()=>{setScores([]);saveScores([]);}}/></div>}
