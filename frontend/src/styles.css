@@ -339,3 +339,12 @@ footer{border-top:1px solid var(--line)}
 .scene-controls .button{min-height:42px;padding:8px 14px}
 .scene-controls .button:disabled{opacity:.4;cursor:not-allowed}
 @media(max-width:720px){.scene-focus{align-items:stretch;flex-direction:column;gap:14px}.scene-controls{display:grid;grid-template-columns:1fr 1fr}.scene-controls .button{width:100%;padding-inline:8px}}
+
+
+/* Phase 2 — recall practice */
+.storyboard-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.recall-instructions{display:flex;gap:12px;align-items:baseline;margin:0 0 16px;padding:13px 16px;border-radius:12px;background:var(--go-bg);color:var(--ink);line-height:1.5}
+.recall-instructions b{color:var(--go);white-space:nowrap}
+.reveal-scene{margin-top:12px}
+.scene-card.selected .scene-select h3{letter-spacing:.02em}
+@media(max-width:720px){.storyboard-actions{width:100%}.storyboard-actions .button{flex:1}.recall-instructions{align-items:flex-start;flex-direction:column;gap:4px}}
