@@ -318,3 +318,24 @@ footer{border-top:1px solid var(--line)}
  .topbar nav{background:var(--sheet);border-top:1px solid var(--line)}
  .word-card{border-radius:14px}
 }
+
+
+/* Phase 2 — interactive storyboard */
+.storyboard{position:relative}
+.storyboard-track{height:4px;background:var(--line);border-radius:999px;margin:0 4px 14px;overflow:hidden}
+.storyboard-track span{display:block;height:100%;background:var(--go);border-radius:inherit;transition:width .2s ease}
+.scene-card{position:relative;overflow:hidden}
+.scene-card.selected{border-color:var(--biro);box-shadow:0 0 0 2px color-mix(in srgb,var(--biro) 18%,transparent),0 8px 20px rgba(41,56,58,.07)}
+.scene-select{display:block;width:100%;padding:0;border:0;background:transparent;color:inherit;text-align:left;cursor:pointer}
+.scene-select:focus-visible{outline:3px solid var(--biro);outline-offset:5px;border-radius:8px}
+.scene-select .word-meta{margin-bottom:10px}
+.scene-select h3{margin-top:0}
+.scene-hint{display:inline-block;margin:0 0 12px;color:var(--go);font-size:13px;font-weight:700}
+.scene-focus{display:flex;align-items:center;justify-content:space-between;gap:24px;margin:16px 0 4px;padding:18px 20px;background:var(--sheet);border:1px solid var(--line);border-left:4px solid var(--go);border-radius:14px}
+.scene-focus h3{font:400 28px/1.15 var(--serif);margin:5px 0}
+.scene-focus p{margin:0;color:var(--soft);line-height:1.6}
+.scene-focus p b{color:var(--go);letter-spacing:.08em}
+.scene-controls{display:flex;flex-wrap:wrap;gap:8px;flex-shrink:0}
+.scene-controls .button{min-height:42px;padding:8px 14px}
+.scene-controls .button:disabled{opacity:.4;cursor:not-allowed}
+@media(max-width:720px){.scene-focus{align-items:stretch;flex-direction:column;gap:14px}.scene-controls{display:grid;grid-template-columns:1fr 1fr}.scene-controls .button{width:100%;padding-inline:8px}}
