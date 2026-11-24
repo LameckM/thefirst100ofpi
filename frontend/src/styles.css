@@ -348,3 +348,15 @@ footer{border-top:1px solid var(--line)}
 .reveal-scene{margin-top:12px}
 .scene-card.selected .scene-select h3{letter-spacing:.02em}
 @media(max-width:720px){.storyboard-actions{width:100%}.storyboard-actions .button{flex:1}.recall-instructions{align-items:flex-start;flex-direction:column;gap:4px}}
+
+
+/* Phase 3 — recall scoring */
+.recall-rating{display:grid;gap:8px;margin-top:14px}
+.recall-rating>span{font-size:14px;font-weight:700;color:var(--soft)}
+.recall-rating>div{display:flex;flex-wrap:wrap;gap:8px}
+.recall-rating button{min-height:42px;padding:8px 14px;border:1px solid var(--line);border-radius:999px;background:transparent;color:var(--ink);font-weight:700}
+.recall-rating button:hover,.recall-rating button.chosen{border-color:var(--go);background:var(--go-bg);color:var(--go)}
+.recall-summary{margin-top:16px}
+.recall-summary h2{margin:6px 0}
+.recall-summary p{color:var(--soft)}
+.recall-score{font:400 56px/1 var(--serif);color:var(--go);margin:12px 0}
