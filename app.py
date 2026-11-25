@@ -150,8 +150,6 @@ def story(req: StoryRequest):
     return {"story": build_story(list(words), list(digits), req.variant)}
 
 
-WORD_RE = r"^[A-Za-z'\-]{1,40}$"
-
 
 @app.get("/api/decode")
 def decode(word: str = Query(..., pattern=WORD_RE)):
