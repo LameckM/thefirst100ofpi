@@ -32,6 +32,15 @@ function reviewDueLabel(item){
  return "Due "+new Date(item.dueAt).toLocaleDateString(undefined,{day:"numeric",month:"short"});
 }
 const KIND_LABEL={mix:"Everything",sounds:"Digit to sounds",digit:"Sound to digit",word:"Word to number",number:"Number to word"};
+const VALID_VIEWS=["create","learn","practice","review","history"];
+function loadTheme(){
+ try{
+  const saved=localStorage.getItem("number-stories-theme");
+  if(saved==="light"||saved==="dark")return saved;
+ }catch{}
+ try{return matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";}
+ catch{return "light";}
+}
 function loadScores(){try{const v=JSON.parse(localStorage.getItem(SCORE_KEY)||"[]");return Array.isArray(v)?v:[];}catch{return [];}}
 function saveScores(list){try{localStorage.setItem(SCORE_KEY,JSON.stringify(list));}catch{}}
 function Progress({scores,onClear}) {
@@ -253,8 +262,8 @@ function Review({items,revealed,onReveal,onRate,onCreate}) {
 function Button({children,kind="primary",...props}) { return <button className={"button "+kind} {...props}>{children}</button>; }
 
 export default function App() {
- const [view,setView]=useState(location.hash.slice(1)||"create");
- const [theme,setTheme]=useState(()=>localStorage.getItem("number-stories-theme")||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"));
+ const [view,setView]=useState(()=>{const requested=location.hash.slice(1);return VALID_VIEWS.includes(requested)?requested:"create";});
+ const [theme,setTheme]=useState(loadTheme);
  const [number,setNumber]=useState(new URLSearchParams(location.search).get("n")||"");
  const [target,setTarget]=useState(3);
  const [result,setResult]=useState(null);
@@ -343,7 +352,9 @@ export default function App() {
   setRevealedReviews(current=>current.filter(value=>value!==id));
  }
  function go(next) {
-  setView(next); history.replaceState(null,"",location.pathname+location.search+"#"+next);
+  const safeView=VALID_VIEWS.includes(next)?next:"create";
+  setView(safeView);
+  window.history.replaceState(null,"",location.pathname+location.search+"#"+safeView);
   window.scrollTo({top:0,behavior:"smooth"});
  }
  async function create(targetValue=target) {
@@ -476,8 +487,21 @@ export default function App() {
  },[finished]);
  useEffect(()=>{if(number)create();},[]);
  useEffect(()=>{
+  const syncViewFromHash=()=>{
+   const requested=location.hash.slice(1);
+   const safeView=VALID_VIEWS.includes(requested)?requested:"create";
+   if(requested!==safeView){
+    window.history.replaceState(null,"",location.pathname+location.search+"#"+safeView);
+   }
+   setView(safeView);
+  };
+  window.addEventListener("hashchange",syncViewFromHash);
+  syncViewFromHash();
+  return ()=>window.removeEventListener("hashchange",syncViewFromHash);
+ },[]);
+ useEffect(()=>{
   document.documentElement.dataset.theme=theme;
-  localStorage.setItem("number-stories-theme",theme);
+  try{localStorage.setItem("number-stories-theme",theme);}catch{}
  },[theme]);
 
  return <div className="shell">
