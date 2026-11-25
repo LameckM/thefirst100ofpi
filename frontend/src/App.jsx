@@ -339,7 +339,16 @@ export default function App() {
  async function create(targetValue=target) {
   if(!number.trim()){setError("Enter a number first.");return;}
   setBusy(true);setError("");
-  try { setResult(await api("/api/encode?number="+encodeURIComponent(number)+"&target="+targetValue)); }
+  try {
+   const encoded=await api("/api/encode?number="+encodeURIComponent(number)+"&target="+targetValue);
+   setResult(encoded);
+   // A new number or grouping size starts a fresh storyboard and recall session.
+   setSelectedScene(0);
+   setRecallMode(false);
+   setRecallRatings({});
+   setRecallQueue(null);
+   setRevealedScenes([]);
+  }
   catch(e){setError(e.message);} finally{setBusy(false);}
  }
  async function story(words,digits,variant) {
