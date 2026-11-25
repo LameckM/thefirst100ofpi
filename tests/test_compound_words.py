@@ -1,13 +1,14 @@
 import sqlite3
 import unittest
 
-from major import compound_words, decode_word, segment
+from major import compound_words, decode_word, ensure_personal_words, segment
 
 
 class CompoundWordTests(unittest.TestCase):
     def setUp(self):
         self.conn = sqlite3.connect(":memory:")
         self.conn.row_factory = sqlite3.Row
+        ensure_personal_words(self.conn)
         self.conn.execute("CREATE TABLE words (word TEXT, digits TEXT, score REAL)")
         self.conn.executemany(
             "INSERT INTO words (word, digits, score) VALUES (?, ?, ?)",
