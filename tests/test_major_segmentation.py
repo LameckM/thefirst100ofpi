@@ -1,13 +1,14 @@
 import sqlite3
 import unittest
 
-from major import segment
+from major import ensure_personal_words, segment
 
 
 class FixedWidthSegmentationTests(unittest.TestCase):
     def setUp(self):
         self.conn = sqlite3.connect(":memory:")
         self.conn.row_factory = sqlite3.Row
+        ensure_personal_words(self.conn)
         self.conn.execute(
             "CREATE TABLE words (word TEXT, digits TEXT, score REAL)"
         )
