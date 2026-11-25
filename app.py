@@ -80,7 +80,7 @@ def encode(
 @app.get("/api/personal-words")
 def list_personal_words(conn: sqlite3.Connection = Depends(get_db)):
     rows = conn.execute(
-        "SELECT word, digits, created_at FROM personal_words "
+        "SELECT word, digits, created_at FROM user_data.personal_words "
         "ORDER BY created_at DESC, word"
     ).fetchall()
     return {"words": [dict(row) for row in rows]}
