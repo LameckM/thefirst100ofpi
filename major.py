@@ -5,6 +5,7 @@ import sqlite3
 from pathlib import Path
 
 DB_PATH = Path(__file__).with_name("major.db")
+PERSONAL_DB_PATH = Path(__file__).with_name("personal.db")
 
 # ARPAbet phoneme -> Major System digit. Vowels, H, W, Y are ignored.
 PHONE_TO_DIGIT = {
@@ -129,6 +130,7 @@ def connect():
     # worker threads; the connection is never shared between requests.
     conn = sqlite3.connect(DB_PATH, timeout=30, check_same_thread=False)
     conn.row_factory = sqlite3.Row
+    conn.execute("ATTACH DATABASE ? AS user_data", (str(PERSONAL_DB_PATH),))
     return conn
 
 
@@ -144,19 +146,29 @@ def words_for(conn, digits, limit=12):
 
 
 def ensure_personal_words(conn):
+    """Create the separate personal library and migrate legacy rows once."""
     conn.execute(
-        "CREATE TABLE IF NOT EXISTS personal_words ("
+        "CREATE TABLE IF NOT EXISTS user_data.personal_words ("
         "id INTEGER PRIMARY KEY AUTOINCREMENT, "
         "word TEXT NOT NULL, digits TEXT NOT NULL, "
         "created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, "
         "UNIQUE(word, digits))"
     )
+    legacy = conn.execute(
+        "SELECT 1 FROM main.sqlite_master WHERE type='table' AND name='personal_words'"
+    ).fetchone()
+    if legacy:
+        conn.execute(
+            "INSERT OR IGNORE INTO user_data.personal_words (word, digits, created_at) "
+            "SELECT word, digits, created_at FROM main.personal_words"
+        )
+        conn.execute("DROP TABLE main.personal_words")
     conn.commit()
 
 
 def personal_words_for(conn, digits, limit=40):
     rows = conn.execute(
-        "SELECT word FROM personal_words WHERE digits = ? "
+        "SELECT word FROM user_data.personal_words WHERE digits = ? "
         "ORDER BY created_at DESC, word LIMIT ?", (digits, limit)
     ).fetchall()
     return [r["word"] for r in rows]
@@ -164,7 +176,7 @@ def personal_words_for(conn, digits, limit=40):
 
 def save_personal_word(conn, word, digits):
     conn.execute(
-        "INSERT OR IGNORE INTO personal_words (word, digits) VALUES (?, ?)",
+        "INSERT OR IGNORE INTO user_data.personal_words (word, digits) VALUES (?, ?)",
         (word, digits),
     )
     conn.commit()
@@ -172,7 +184,7 @@ def save_personal_word(conn, word, digits):
 
 def delete_personal_word(conn, word, digits):
     conn.execute(
-        "DELETE FROM personal_words WHERE word = ? AND digits = ?",
+        "DELETE FROM user_data.personal_words WHERE word = ? AND digits = ?",
         (word, digits),
     )
     conn.commit()
