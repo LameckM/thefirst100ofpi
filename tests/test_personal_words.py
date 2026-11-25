@@ -16,6 +16,7 @@ class PersonalWordLibraryTests(unittest.TestCase):
     def setUp(self):
         self.conn = sqlite3.connect(":memory:")
         self.conn.row_factory = sqlite3.Row
+        self.conn.execute("ATTACH DATABASE ':memory:' AS user_data")
         self.conn.execute("CREATE TABLE words (word TEXT, digits TEXT, score REAL)")
         self.conn.execute("INSERT INTO words VALUES ('tarot', '141', 8.0)")
         ensure_personal_words(self.conn)
