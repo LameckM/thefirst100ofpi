@@ -50,9 +50,9 @@ To rebuild the dictionary after updating the project dependencies:
 python build_db.py
 ```
 
-The rebuild replaces the generated dictionary but preserves the `personal_words` table, so saved custom words are not erased.
+The rebuild replaces only the shared dictionary. Personal vocabulary is stored separately in the local, Git-ignored `personal.db`, so rebuilding the dictionary does not erase saved custom words.
 
-When a suggested word is missing or does not suit you, add a custom word to that number group in the Create view. The API checks its CMU pronunciation against the exact digit group before saving it. Saved words are stored in the local `major.db` database and are preferred in future encodings on that installation.
+When a suggested word is missing or does not suit you, add a custom word to that number group in the Create view. The API checks its CMU pronunciation against the exact digit group before saving it. Saved words are stored in the local, Git-ignored `personal.db` database and are preferred in future encodings on that installation. On first startup after this change, any existing `personal_words` entries are migrated from `major.db` into `personal.db`.
 
 Personal-word endpoints:
 - `GET /api/personal-words`
