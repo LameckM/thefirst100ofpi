@@ -8,6 +8,7 @@ class FixedWidthSegmentationTests(unittest.TestCase):
     def setUp(self):
         self.conn = sqlite3.connect(":memory:")
         self.conn.row_factory = sqlite3.Row
+        self.conn.execute("ATTACH DATABASE ':memory:' AS user_data")
         ensure_personal_words(self.conn)
         self.conn.execute(
             "CREATE TABLE words (word TEXT, digits TEXT, score REAL)"
