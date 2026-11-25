@@ -89,8 +89,8 @@ def main():
     wn = WordNet()
     pron = cmudict.dict()
 
-    # Rebuild only the generated dictionary. Keep the personal_words table
-    # in the same SQLite file so a vocabulary refresh never deletes user data.
+    # Rebuild only the shared dictionary. Personal vocabulary lives in
+    # personal.db and is therefore untouched by this rebuild.
     conn = sqlite3.connect(DB_PATH)
     conn.execute("DROP TABLE IF EXISTS words")
     conn.execute(
