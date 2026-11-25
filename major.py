@@ -124,7 +124,10 @@ def explain(word):
 
 
 def connect():
-    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+    # Each request gets its own connection. check_same_thread=False is needed
+    # because FastAPI may run a sync dependency and endpoint on different
+    # worker threads; the connection is never shared between requests.
+    conn = sqlite3.connect(DB_PATH, timeout=30, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -152,7 +155,6 @@ def ensure_personal_words(conn):
 
 
 def personal_words_for(conn, digits, limit=40):
-    ensure_personal_words(conn)
     rows = conn.execute(
         "SELECT word FROM personal_words WHERE digits = ? "
         "ORDER BY created_at DESC, word LIMIT ?", (digits, limit)
@@ -161,7 +163,6 @@ def personal_words_for(conn, digits, limit=40):
 
 
 def save_personal_word(conn, word, digits):
-    ensure_personal_words(conn)
     conn.execute(
         "INSERT OR IGNORE INTO personal_words (word, digits) VALUES (?, ?)",
         (word, digits),
@@ -170,7 +171,6 @@ def save_personal_word(conn, word, digits):
 
 
 def delete_personal_word(conn, word, digits):
-    ensure_personal_words(conn)
     conn.execute(
         "DELETE FROM personal_words WHERE word = ? AND digits = ?",
         (word, digits),
