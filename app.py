@@ -4,8 +4,9 @@ Run: uvicorn app:app --reload
 """
 from pathlib import Path
 import re
+import sqlite3
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -23,7 +24,25 @@ STATIC = ROOT / "static"
 FRONTEND_DIST = ROOT / "frontend" / "dist"
 
 app = FastAPI(title="Number Stories")
-conn = connect()
+
+
+def get_db():
+    """Provide one SQLite connection per request and always close it."""
+    conn = connect()
+    try:
+        yield conn
+    finally:
+        conn.close()
+
+
+@app.on_event("startup")
+def initialize_database():
+    """Run schema creation once when the application starts, not per read."""
+    conn = connect()
+    try:
+        ensure_personal_words(conn)
+    finally:
+        conn.close()
 
 
 class PersonalWordRequest(BaseModel):
@@ -42,6 +61,7 @@ def encode(
     number: str = Query(..., min_length=1),
     target: int = Query(3, ge=2, le=4),
     compounds: bool = Query(True),
+    conn: sqlite3.Connection = Depends(get_db),
 ):
     digits = clean_number(number)
     if not digits:
@@ -58,8 +78,7 @@ def encode(
 
 
 @app.get("/api/personal-words")
-def list_personal_words():
-    ensure_personal_words(conn)
+def list_personal_words(conn: sqlite3.Connection = Depends(get_db)):
     rows = conn.execute(
         "SELECT word, digits, created_at FROM personal_words "
         "ORDER BY created_at DESC, word"
@@ -68,7 +87,7 @@ def list_personal_words():
 
 
 @app.post("/api/personal-words")
-def add_personal_word(req: PersonalWordRequest):
+def add_personal_word(req: PersonalWordRequest, conn: sqlite3.Connection = Depends(get_db)):
     word = req.word.strip().lower()
     digits = req.digits.strip()
     if not word or not re.fullmatch(WORD_RE, word):
@@ -93,13 +112,21 @@ def add_personal_word(req: PersonalWordRequest):
 
 
 @app.delete("/api/personal-words")
-def remove_personal_word(word: str = Query(...), digits: str = Query(..., pattern=r"^\d{1,4}$")):
+def remove_personal_word(
+    word: str = Query(...),
+    digits: str = Query(..., pattern=r"^\d{1,4}$"),
+    conn: sqlite3.Connection = Depends(get_db),
+):
     delete_personal_word(conn, word.strip().lower(), digits)
     return {"deleted": True}
 
 
 @app.get("/api/words")
-def more_words(digits: str = Query(..., pattern=r"^\d{1,4}$"), limit: int = Query(40, ge=1, le=100)):
+def more_words(
+    digits: str = Query(..., pattern=r"^\d{1,4}$"),
+    limit: int = Query(40, ge=1, le=100),
+    conn: sqlite3.Connection = Depends(get_db),
+):
     found = words_for(conn, digits, limit)
     if not found and len(digits) >= 3:
         # no single word for this number: offer blends of two real words instead
@@ -149,6 +176,7 @@ def check_word(word: str = Query(..., pattern=WORD_RE), digits: str = Query(...,
 def quiz(
     kind: str = Query("mix", pattern="^(mix|sounds|digit|word|number)$"),
     level: str = Query("easy", pattern="^(easy|medium)$"),
+    conn: sqlite3.Connection = Depends(get_db),
 ):
     return make_question(conn, kind, level)
 
