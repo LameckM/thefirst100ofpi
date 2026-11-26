@@ -5,6 +5,7 @@ import sqlite3
 from pathlib import Path
 
 DB_PATH = Path(__file__).with_name("major.db")
+PERSONAL_DB_PATH = Path(__file__).with_name("personal.db")
 
 # ARPAbet phoneme -> Major System digit. Vowels, H, W, Y are ignored.
 PHONE_TO_DIGIT = {
@@ -68,7 +69,7 @@ def _decode_compound(word):
     for k in range(2, len(word) - 1):
         a, b = word[:k], word[k:]
         if a in d and b in d:
-            out.append(d[a][0] + d[b][0])
+            out.extend(pa + pb for pa in d[a] for pb in d[b])
     return out
 
 
@@ -96,6 +97,23 @@ def decode_word(word, compound=False):
     return out
 
 
+def validate_personal_word(word, digits):
+    """Validate a saved mapping without rejecting words absent from CMU.
+
+    Known words must match at least one recorded pronunciation. Unknown words
+    may be saved as user-confirmed mappings; spelling alone is not treated as
+    proof of pronunciation.
+    """
+    options = decode_word(word)
+    if options is None:
+        return True, "custom"
+    if any(option["digits"] == digits for option in options):
+        return True, "dictionary"
+    mappings = sorted({option["digits"] for option in options if option["digits"]})
+    shown = ", ".join(mappings) if mappings else "no digits"
+    return False, shown
+
+
 def explain(word):
     """'tarot: t=1 · r=4 · t=1 -> 141'"""
     opts = decode_word(word)
@@ -107,17 +125,69 @@ def explain(word):
 
 
 def connect():
-    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+    # Each request gets its own connection. check_same_thread=False is needed
+    # because FastAPI may run a sync dependency and endpoint on different
+    # worker threads; the connection is never shared between requests.
+    conn = sqlite3.connect(DB_PATH, timeout=30, check_same_thread=False)
     conn.row_factory = sqlite3.Row
+    conn.execute("ATTACH DATABASE ? AS user_data", (str(PERSONAL_DB_PATH),))
     return conn
 
 
 def words_for(conn, digits, limit=12):
+    # A word may have more than one CMU pronunciation. Return it once per
+    # digit sequence, keeping its best score.
     rows = conn.execute(
-        "SELECT word, score FROM words WHERE digits = ? ORDER BY score DESC, word LIMIT ?",
+        "SELECT word, MAX(score) AS score FROM words "
+        "WHERE digits = ? GROUP BY word ORDER BY score DESC, word LIMIT ?",
         (digits, limit),
     ).fetchall()
     return [{"word": r["word"], "score": round(r["score"], 2)} for r in rows]
+
+
+def ensure_personal_words(conn):
+    """Create the separate personal library and migrate legacy rows once."""
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS user_data.personal_words ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+        "word TEXT NOT NULL, digits TEXT NOT NULL, "
+        "created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, "
+        "UNIQUE(word, digits))"
+    )
+    legacy = conn.execute(
+        "SELECT 1 FROM main.sqlite_master WHERE type='table' AND name='personal_words'"
+    ).fetchone()
+    if legacy:
+        conn.execute(
+            "INSERT OR IGNORE INTO user_data.personal_words (word, digits, created_at) "
+            "SELECT word, digits, created_at FROM main.personal_words"
+        )
+        conn.execute("DROP TABLE main.personal_words")
+    conn.commit()
+
+
+def personal_words_for(conn, digits, limit=40):
+    rows = conn.execute(
+        "SELECT word FROM user_data.personal_words WHERE digits = ? "
+        "ORDER BY created_at DESC, word LIMIT ?", (digits, limit)
+    ).fetchall()
+    return [r["word"] for r in rows]
+
+
+def save_personal_word(conn, word, digits):
+    conn.execute(
+        "INSERT OR IGNORE INTO user_data.personal_words (word, digits) VALUES (?, ?)",
+        (word, digits),
+    )
+    conn.commit()
+
+
+def delete_personal_word(conn, word, digits):
+    conn.execute(
+        "DELETE FROM user_data.personal_words WHERE word = ? AND digits = ?",
+        (word, digits),
+    )
+    conn.commit()
 
 
 MIN_PART_SCORE = 5.0       # both halves of a compound must be decent, picturable words
@@ -158,65 +228,44 @@ def clean_number(raw):
 
 
 def segment(conn, digits, target=3, max_len=4, alt_count=12, compounds=True):
-    """Split `digits` into chunks and pick a word for each.
+    """Split digits into consecutive, fixed-width chunks.
 
-    Cost per chunk = (11 - word score) + 3 * |len - target|, so the split
-    leans toward `target` digits per word but will bend for a better word.
+    The selected target is a grouping size, not a scoring preference:
+    target=2 gives 14-15-92..., target=3 gives 141-592..., etc.
+    A final short chunk is retained when the input length is not divisible
+    by target. Every word candidate must encode that exact chunk.
 
-    When a chunk of 3 or more digits has no real word, and `compounds` is on,
-    a blend of two real words stands in for it (see compound_words).
+    If a chunk of 3 or more digits has no real word, and `compounds` is on,
+    a blend of two real words (399 -> 'mapboy' = map + boy) fills the gap.
+    The group boundaries never move.
     """
-    n = len(digits)
-    cache = {}
+    if target not in (2, 3, 4):
+        raise ValueError("target must be 2, 3, or 4")
 
-    def cands(i, L):
-        key = (i, L)
-        if key not in cache:
-            found = words_for(conn, digits[i:i + L], alt_count)
-            if not found and compounds and L >= 3:
-                found = compound_words(conn, digits[i:i + L], alt_count)
-            cache[key] = found
-        return cache[key]
-
-    INF = float("inf")
-    best = [INF] * (n + 1)
-    back = [None] * (n + 1)
-    best[0] = 0.0
-    for i in range(n):
-        if best[i] == INF:
-            continue
-        for L in range(1, min(max_len, n - i) + 1):
-            c = cands(i, L)
-            if not c:
-                continue
-            weak = max(0.0, 6.0 - c[0]["score"])   # steer away from poor words when a split avoids them
-            cost = (11 - c[0]["score"]) + 3 * abs(L - target) + weak * weak
-            if best[i] + cost < best[i + L]:
-                best[i + L] = best[i] + cost
-                back[i + L] = (i, L)
-
-    if best[n] == INF:
-        return []
-
-    spans = []
-    j = n
-    while j > 0:
-        i, L = back[j]
-        spans.append((i, L))
-        j = i
-    spans.reverse()
-
-    chunks, used = [], set()
-    for i, L in spans:
-        alts = cands(i, L)
-        pick = next((a for a in alts if a["word"] not in used), alts[0])
-        used.add(pick["word"])
+    chunks = []
+    used = set()
+    for i in range(0, len(digits), target):
+        chunk_digits = digits[i:i + target]
+        personal = [
+            {"word": word, "score": 10_000.0}
+            for word in personal_words_for(conn, chunk_digits, alt_count)
+        ]
+        candidates = personal + [
+            item for item in words_for(conn, chunk_digits, alt_count)
+            if item["word"] not in {saved["word"] for saved in personal}
+        ]
+        if not candidates and compounds and len(chunk_digits) >= 3:
+            candidates = compound_words(conn, chunk_digits, alt_count)
+        pick = next((item for item in candidates if item["word"] not in used), candidates[0] if candidates else None)
+        if pick:
+            used.add(pick["word"])
         chunk = {
-            "digits": digits[i:i + L],
-            "word": pick["word"],
-            "alternatives": [a["word"] for a in alts],
+            "digits": chunk_digits,
+            # Preserve the exact number boundary even without a dictionary match.
+            "word": pick["word"] if pick else "",
+            "alternatives": [item["word"] for item in candidates],
         }
-        hints = {a["word"]: " + ".join(a["parts"]) for a in alts if "parts" in a}
+        hints = {item["word"]: " + ".join(item["parts"]) for item in candidates if "parts" in item}
         if hints:
             chunk["hints"] = hints
         chunks.append(chunk)
@@ -224,9 +273,11 @@ def segment(conn, digits, target=3, max_len=4, alt_count=12, compounds=True):
 
 
 # ---------------------------------------------------------------- stories
-
-def _art(word):
-    return ("an " if word[0] in "aeiou" else "a ") + word
+#
+# A word is only ever written once in a story, as its own marker, and the text
+# around it never names another word or puts "a/an" in front of it. The previous
+# image is called "it", and every word gets "the". That keeps a story correct
+# when someone swaps a word, and lets the editor cut it cleanly at each word.
 
 
 def _mark(word, digits=""):
@@ -234,24 +285,29 @@ def _mark(word, digits=""):
 
 
 OPENERS = [
-    "Start with {B}, as big as a bus, standing right in front of you.",
-    "Picture {B} sitting in the middle of the room, glowing bright orange.",
-    "Imagine {B} the size of a house blocking the doorway.",
+    "Start with the {B}, as big as a bus, standing right in front of you.",
+    "Picture the {B} sitting in the middle of the room, glowing bright orange.",
+    "Imagine the {B} the size of a house, blocking the doorway.",
 ]
 
+# "it" is the image from the sentence before.
 LINKS = [
-    "Then the {a} slams into {B} with a loud crash.",
-    "Suddenly the {a} explodes, and out jumps {B}.",
-    "The {a} is stuck to {B} with huge strips of sticky tape.",
-    "{B_cap} is chasing the {a} around the room.",
-    "The {a} is wearing {B} like a hat.",
-    "Someone is hitting the {a} with {B}.",
-    "Out of the {a} pours {B}, dripping wet.",
-    "{B_cap} is balancing on top of the {a}.",
-    "The {a} starts singing to {B}, very loudly.",
-    "The {a} catches fire, and {B} tries to put it out.",
-    "The {a} is being eaten by {B}.",
-    "{B_cap} slides down the {a} like a slide.",
+    "Then it slams into the {B} with a loud crash.",
+    "Suddenly it explodes, and out jumps the {B}.",
+    "It is stuck to the {B} with huge strips of sticky tape.",
+    "The {B} is chasing it around the room.",
+    "It is wearing the {B} like a hat.",
+    "Someone is hitting it with the {B}.",
+    "Out of it pours the {B}, dripping wet.",
+    "The {B} is balancing on top of it.",
+    "It starts singing to the {B}, very loudly.",
+    "It catches fire, and the {B} tries to put it out.",
+    "It is being eaten by the {B}.",
+    "The {B} slides down it like a slide.",
+    "It swallows the {B} whole, and starts to hiccup.",
+    "It tows the {B} down the street.",
+    "The {B} wraps around it and squeezes tight.",
+    "It paints the {B} bright green.",
 ]
 
 
@@ -265,16 +321,8 @@ def build_story(words, digits_list=None, variant=0):
     links = LINKS[:]
     rng.shuffle(links)
 
-    def fill(template, prev, w, d):
-        marked = _mark(w, d)
-        return template.format(
-            a=prev,
-            B=f"{_art(w).split(' ')[0]} {marked}",
-            B_cap=f"{_art(w).split(' ')[0].capitalize()} {marked}",
-        )
-
-    sentences = [fill(rng.choice(OPENERS), "", words[0], digits_list[0])]
+    sentences = [rng.choice(OPENERS).format(B=_mark(words[0], digits_list[0]))]
     for k in range(1, len(words)):
         template = links[(k - 1) % len(links)]
-        sentences.append(fill(template, words[k - 1], words[k], digits_list[k]))
+        sentences.append(template.format(B=_mark(words[k], digits_list[k])))
     return sentences

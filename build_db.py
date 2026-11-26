@@ -74,14 +74,25 @@ def analyse(wn, word):
     return 1, 1, 0
 
 
+def word_mappings(word, pronunciations):
+    """Yield every distinct, usable Major System mapping for a dictionary word."""
+    seen = set()
+    for phones in pronunciations:
+        digits = phones_to_digits(phones)
+        if digits and len(digits) <= MAX_DIGITS and digits not in seen:
+            seen.add(digits)
+            yield word, digits
+
+
 def main():
     profanity.load_censor_words()
     wn = WordNet()
     pron = cmudict.dict()
 
-    if DB_PATH.exists():
-        DB_PATH.unlink()
+    # Rebuild only the shared dictionary. Personal vocabulary lives in
+    # personal.db and is therefore untouched by this rebuild.
     conn = sqlite3.connect(DB_PATH)
+    conn.execute("DROP TABLE IF EXISTS words")
     conn.execute(
         "CREATE TABLE words (word TEXT, digits TEXT, score REAL, zipf REAL, kind INTEGER,"
         " known INTEGER, proper INTEGER)"
@@ -98,18 +109,20 @@ def main():
             continue
         if profanity.contains_profanity(word):
             continue
-        digits = phones_to_digits(prons[0])
-        if not digits or len(digits) > MAX_DIGITS:
+        mappings = list(word_mappings(word, prons))
+        if not mappings:
             continue
         kind, known, proper = analyse(wn, word)
         # concrete nouns get a big bump, non-nouns a penalty;
         # frequency is capped so very common words don't beat better pictures
         score = min(zipf, 5.5) + {2: 3.0, 1: 1.0, 0: -1.0}[kind]
         if proper:
-            score -= 3.0      # names make weak pictures; keep only as a last resort
+            score -= 3.0
         if not known:
-            score -= 1.5      # not in WordNet: usually a rare name, acronym or foreign word
-        rows.append((word, digits, score, zipf, kind, known, proper))
+            score -= 1.5
+        # Store every distinct valid pronunciation, not only the first one.
+        rows.extend((word, digits, score, zipf, kind, known, proper)
+                    for _, digits in mappings)
 
     conn.executemany("INSERT INTO words VALUES (?,?,?,?,?,?,?)", rows)
     conn.execute("CREATE INDEX idx_digits ON words (digits, score DESC)")

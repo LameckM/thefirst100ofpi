@@ -1,23 +1,57 @@
-"""FastAPI backend for the Major System number memorizer.
+"""FastAPI backend for Number Stories.
 
-Run:  uvicorn app:app --reload
-Open: http://127.0.0.1:8000
+Run: uvicorn app:app --reload
 """
+from contextlib import asynccontextmanager
 from pathlib import Path
+import re
+import sqlite3
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from major import build_story, clean_number, compound_words, connect, decode_word, segment, words_for
+from major import (
+    build_story, clean_number, compound_words, connect, decode_word, delete_personal_word,
+    ensure_personal_words, save_personal_word, segment, validate_personal_word, words_for,
+)
 from quiz import make_question
 
 MAX_DIGITS = 300
-STATIC = Path(__file__).with_name("static")
+WORD_RE = r"^[A-Za-z'-]{1,40}$"
+ROOT = Path(__file__).resolve().parent
+STATIC = ROOT / "static"
+FRONTEND_DIST = ROOT / "frontend" / "dist"
 
-app = FastAPI(title="Major System Memorizer")
-conn = connect()
+@asynccontextmanager
+async def lifespan(_app):
+    """Create the personal-words schema once at startup, not per read."""
+    conn = connect()
+    try:
+        ensure_personal_words(conn)
+    finally:
+        conn.close()
+    yield
+
+
+app = FastAPI(title="Number Stories", lifespan=lifespan)
+
+
+def get_db():
+    """Provide one SQLite connection per request and always close it."""
+    conn = connect()
+    try:
+        yield conn
+    finally:
+        conn.close()
+
+
+
+
+class PersonalWordRequest(BaseModel):
+    word: str
+    digits: str
 
 
 class StoryRequest(BaseModel):
@@ -29,8 +63,9 @@ class StoryRequest(BaseModel):
 @app.get("/api/encode")
 def encode(
     number: str = Query(..., min_length=1),
-    target: int = Query(3, ge=1, le=4),
+    target: int = Query(3, ge=2, le=4),
     compounds: bool = Query(True),
+    conn: sqlite3.Connection = Depends(get_db),
 ):
     digits = clean_number(number)
     if not digits:
@@ -40,17 +75,62 @@ def encode(
     chunks = segment(conn, digits, target=target, compounds=compounds)
     if not chunks:
         raise HTTPException(422, "Could not find words for that number.")
-    story = build_story([c["word"] for c in chunks], [c["digits"] for c in chunks])
+    matched = [c for c in chunks if c["word"]]
+    story = build_story([c["word"] for c in matched], [c["digits"] for c in matched])
+    return {"digits": digits, "grouped": "-".join(c["digits"] for c in chunks),
+            "chunks": chunks, "story": story}
+
+
+@app.get("/api/personal-words")
+def list_personal_words(conn: sqlite3.Connection = Depends(get_db)):
+    rows = conn.execute(
+        "SELECT word, digits, created_at FROM user_data.personal_words "
+        "ORDER BY created_at DESC, word"
+    ).fetchall()
+    return {"words": [dict(row) for row in rows]}
+
+
+@app.post("/api/personal-words")
+def add_personal_word(req: PersonalWordRequest, conn: sqlite3.Connection = Depends(get_db)):
+    word = req.word.strip().lower()
+    digits = req.digits.strip()
+    if not word or not re.fullmatch(WORD_RE, word):
+        raise HTTPException(400, "Enter a valid word (letters, apostrophes or hyphens only).")
+    if not re.fullmatch(r"\d{1,4}", digits):
+        raise HTTPException(400, "The number group must contain 1 to 4 digits.")
+    valid, validation = validate_personal_word(word, digits)
+    if not valid:
+        raise HTTPException(422, f"'{word}' maps to {validation}, not {digits}.")
+    save_personal_word(conn, word, digits)
     return {
+        "saved": True,
+        "word": word,
         "digits": digits,
-        "grouped": "-".join(c["digits"] for c in chunks),
-        "chunks": chunks,
-        "story": story,
+        "verification": "dictionary" if validation == "dictionary" else "user-confirmed",
+        "message": (
+            "Pronunciation matched the dictionary."
+            if validation == "dictionary"
+            else "Custom mapping saved. Make sure the spoken consonant sounds match this number."
+        ),
     }
 
 
+@app.delete("/api/personal-words")
+def remove_personal_word(
+    word: str = Query(...),
+    digits: str = Query(..., pattern=r"^\d{1,4}$"),
+    conn: sqlite3.Connection = Depends(get_db),
+):
+    delete_personal_word(conn, word.strip().lower(), digits)
+    return {"deleted": True}
+
+
 @app.get("/api/words")
-def more_words(digits: str = Query(..., pattern=r"^\d{1,4}$"), limit: int = Query(40, ge=1, le=100)):
+def more_words(
+    digits: str = Query(..., pattern=r"^\d{1,4}$"),
+    limit: int = Query(40, ge=1, le=100),
+    conn: sqlite3.Connection = Depends(get_db),
+):
     found = words_for(conn, digits, limit)
     if not found and len(digits) >= 3:
         # no single word for this number: offer blends of two real words instead
@@ -61,18 +141,22 @@ def more_words(digits: str = Query(..., pattern=r"^\d{1,4}$"), limit: int = Quer
 
 @app.post("/api/story")
 def story(req: StoryRequest):
-    words = [w.strip().lower() for w in req.words if w.strip()]
-    if not words or len(words) > 120:
-        raise HTTPException(400, "Send between 1 and 120 words.")
-    return {"story": build_story(words, req.digits, req.variant)}
+    if req.digits is not None and len(req.digits) != len(req.words):
+        raise HTTPException(400, "The digits list must contain one entry per word.")
+    pairs = [
+        (word.strip().lower(), req.digits[i] if req.digits is not None else "")
+        for i, word in enumerate(req.words)
+        if word and word.strip()
+    ]
+    if not pairs or len(pairs) > 120:
+        raise HTTPException(400, "Send between 1 and 120 non-empty words.")
+    words, digits = zip(*pairs)
+    return {"story": build_story(list(words), list(digits), req.variant)}
 
-
-WORD_RE = r"^[A-Za-z'\-]{1,40}$"
 
 
 @app.get("/api/decode")
 def decode(word: str = Query(..., pattern=WORD_RE)):
-    """Turn any English word into its Major System number, sound by sound."""
     w = word.strip().lower()
     opts = decode_word(w, compound=True)
     return {"word": w, "found": opts is not None, "options": opts or []}
@@ -80,7 +164,6 @@ def decode(word: str = Query(..., pattern=WORD_RE)):
 
 @app.get("/api/check-word")
 def check_word(word: str = Query(..., pattern=WORD_RE), digits: str = Query(..., pattern=r"^\d{1,4}$")):
-    """Does this word stand for these digits? Used by the practice test."""
     w = word.strip().lower()
     opts = decode_word(w)
     if opts is None:
@@ -95,13 +178,21 @@ def check_word(word: str = Query(..., pattern=WORD_RE), digits: str = Query(...,
 def quiz(
     kind: str = Query("mix", pattern="^(mix|sounds|digit|word|number)$"),
     level: str = Query("easy", pattern="^(easy|medium)$"),
+    conn: sqlite3.Connection = Depends(get_db),
 ):
     return make_question(conn, kind, level)
 
 
 @app.get("/")
 def index():
+    # Prefer the compiled React app once frontend/dist exists. Keep the old
+    # static page as a no-build fallback so the API remains usable during setup.
+    react_index = FRONTEND_DIST / "index.html"
+    if react_index.is_file():
+        return FileResponse(react_index)
     return FileResponse(STATIC / "index.html")
 
 
+if FRONTEND_DIST.is_dir():
+    app.mount("/assets", StaticFiles(directory=FRONTEND_DIST / "assets"), name="assets")
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
