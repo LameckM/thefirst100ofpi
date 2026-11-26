@@ -389,3 +389,38 @@ footer{border-top:1px solid var(--line)}
 .review-upcoming-item b{color:var(--ink);font:400 18px var(--serif)}
 .review-upcoming-item small{color:var(--soft)}
 @media(max-width:720px){.review-stats{gap:8px}.review-stats>div{padding:12px}.review-stats b{font-size:28px}.review-stats span{font-size:12px}.review-list{grid-template-columns:1fr}.review-section-head h2{font-size:24px}}
+
+
+/* Mobile-first navigation and calmer page hierarchy */
+.topbar nav button{white-space:nowrap}
+.topbar nav button.active{font-weight:700}
+.progress-tabs{display:flex;gap:8px;padding:5px;margin:0 0 24px;background:var(--sheet);border:1px solid var(--line);border-radius:999px;width:max-content;max-width:100%}
+.progress-tabs button{min-height:42px;padding:8px 20px;border:0;border-radius:999px;background:transparent;color:var(--soft);font-weight:700}
+.progress-tabs button.active{background:var(--biro);color:#fff}
+.progress-extra{margin-top:18px}
+.optional-section{margin:18px 0;border:1px solid var(--line);border-radius:14px;background:var(--sheet);overflow:hidden}
+.optional-section>summary{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:64px;padding:16px 20px;cursor:pointer;font-weight:700;list-style:none}
+.optional-section>summary::-webkit-details-marker{display:none}
+.optional-section>summary::after{content:"+";font-size:22px;color:var(--go)}
+.optional-section[open]>summary::after{content:"−"}
+.optional-section>summary span{margin-left:auto;color:var(--soft);font-size:13px;font-weight:400;text-align:right}
+.optional-section>.input-panel{margin:0;border:0;border-top:1px solid var(--line);border-radius:0;box-shadow:none}
+.recall-active .word-grid{display:none}
+.recall-active .storyboard-track{margin-bottom:18px;height:6px}
+.recall-active+.scene-focus{margin-top:0}
+.scene-focus{position:relative;bottom:auto;z-index:auto;box-shadow:0 4px 16px rgba(41,56,58,.07)}
+.recall-active+.scene-focus{min-height:clamp(300px,48vh,520px);justify-content:space-between}
+.recall-active+.scene-focus>div:first-child{max-width:680px}
+.recall-active+.scene-focus h3{font-size:clamp(30px,5vw,46px);margin:14px 0}
+.recall-active+.scene-focus p{font-size:17px}
+.progress-page>.progress-tabs{margin-bottom:24px}
+@media(max-width:720px){
+ .topbar nav{justify-content:stretch}
+ .topbar nav button{min-width:0;padding:8px 4px;font-size:14px}
+ .progress-tabs{width:100%;display:grid;grid-template-columns:1fr 1fr}
+ .progress-tabs button{width:100%}
+ .optional-section>summary{align-items:flex-start;flex-wrap:wrap}
+ .optional-section>summary span{width:100%;margin:0;text-align:left}
+ .recall-active+.scene-focus{min-height:0;padding:22px 18px}
+ .recall-active+.scene-focus .scene-controls{grid-template-columns:1fr 1fr}
+}
