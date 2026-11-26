@@ -2,6 +2,7 @@
 
 Run: uvicorn app:app --reload
 """
+from contextlib import asynccontextmanager
 from pathlib import Path
 import re
 import sqlite3
@@ -23,7 +24,18 @@ ROOT = Path(__file__).resolve().parent
 STATIC = ROOT / "static"
 FRONTEND_DIST = ROOT / "frontend" / "dist"
 
-app = FastAPI(title="Number Stories")
+@asynccontextmanager
+async def lifespan(_app):
+    """Create the personal-words schema once at startup, not per read."""
+    conn = connect()
+    try:
+        ensure_personal_words(conn)
+    finally:
+        conn.close()
+    yield
+
+
+app = FastAPI(title="Number Stories", lifespan=lifespan)
 
 
 def get_db():
@@ -35,14 +47,6 @@ def get_db():
         conn.close()
 
 
-@app.on_event("startup")
-def initialize_database():
-    """Run schema creation once when the application starts, not per read."""
-    conn = connect()
-    try:
-        ensure_personal_words(conn)
-    finally:
-        conn.close()
 
 
 class PersonalWordRequest(BaseModel):

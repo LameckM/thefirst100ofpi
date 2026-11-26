@@ -56,8 +56,8 @@ When a suggested word is missing or does not suit you, add a custom word to that
 
 Personal-word endpoints:
 - `GET /api/personal-words`
-- `POST /api/personal-words` with `{"word":"tarot","digits":"141"}`
-- `DELETE /api/personal-words?word=tarot&digits=141`
+- `POST /api/personal-words` with `{"word":"tarot","digits":"14"}`
+- `DELETE /api/personal-words?word=tarot&digits=14`
 
 ## Compound words for numbers with no word
 
