@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import Pi from "./Pi.jsx";
+import { WORD, loadWords, saveWords, addWord, removeWord, mineFirst, applyWords } from "./words.js";
 
 const API = import.meta.env.VITE_API_BASE_URL || "";
 const MAP = [
@@ -364,12 +365,19 @@ export default function App() {
   window.history.replaceState(null,"",location.pathname+location.search+"#"+safeView);
   window.scrollTo({top:0,behavior:"smooth"});
  }
+ // The server only knows the dictionary; the visitor's own words are applied here.
+ async function encodeNumber(value,size) {
+  const encoded=await api("/api/encode?number="+encodeURIComponent(value)+"&target="+size);
+  const chunks=applyWords(encoded.chunks,loadWords());
+  if(chunks.every((c,i)=>c.word===encoded.chunks[i].word))return {...encoded,chunks};
+  const r=await story(chunks.map(c=>c.word),chunks.map(c=>c.digits),0);
+  return {...encoded,chunks,story:r.story};
+ }
  async function create(targetValue=target) {
   if(!number.trim()){setError("Enter a number first.");return;}
   setBusy(true);setError("");
   try {
-   const encoded=await api("/api/encode?number="+encodeURIComponent(number)+"&target="+targetValue);
-   setResult(encoded);
+   setResult(await encodeNumber(number,targetValue));
    // A new number or grouping size starts a fresh storyboard and recall session.
    setSelectedScene(0);
    setRecallMode(false);
@@ -390,7 +398,7 @@ export default function App() {
   catch(e){setError(e.message);}
  }
  async function more(i) {
-  try {const r=await api("/api/words?digits="+result.chunks[i].digits+"&limit=40");setResult(v=>({...v,chunks:v.chunks.map((c,n)=>n===i?{...c,alternatives:r.words,hints:{...(c.hints||{}),...(r.hints||{})},expanded:true}:c)}));}
+  try {const r=await api("/api/words?digits="+result.chunks[i].digits+"&limit=40");setResult(v=>({...v,chunks:v.chunks.map((c,n)=>n===i?{...c,alternatives:mineFirst(r.words,c.digits,loadWords()),hints:{...(c.hints||{}),...(r.hints||{})},expanded:true}:c)}));}
   catch(e){setError(e.message);}
  }
  function saveStory(base,updateId,title) {
@@ -415,7 +423,7 @@ export default function App() {
  async function openSaved(item) {
   setError("");setBusy(true);
   try {
-   const r=await api("/api/encode?number="+encodeURIComponent(item.number)+"&target="+item.size);
+   const r=await encodeNumber(item.number,item.size);
    const draft=loadOwn()[r.grouped];
    if(draft&&Array.isArray(draft.slots)&&draft.slots.some(x=>x.trim())&&JSON.stringify(draft.slots)!==JSON.stringify(item.slots)&&!confirm("You already have a draft for this number on the Create page. Replace it with this saved story?"))return;
    const chunks=r.chunks.map((c,i)=>{const w=item.words[i];if(!w)return c;return {...c,word:w,alternatives:[w,...(c.alternatives||[]).filter(a=>a!==w)]};});
@@ -451,26 +459,28 @@ export default function App() {
  }
  async function saveCustomWord(e, digits) {
   e.preventDefault();
-  const value=(customWords[digits]||"").trim();
-  if(!value){setCustomMessages(v=>({...v,[digits]:"Enter a word first."}));return;}
+  const say=text=>setCustomMessages(v=>({...v,[digits]:text}));
+  const value=(customWords[digits]||"").trim().toLowerCase();
+  if(!value){say("Enter a word first.");return;}
+  if(!WORD.test(value)){say("Use letters, apostrophes or hyphens only.");return;}
   try {
-   const saved=await api("/api/personal-words",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({word:value,digits})});
-   setCustomMessages(v=>({...v,[digits]:saved.verification==="dictionary"?"Saved — pronunciation verified by the dictionary.":"Saved as a custom mapping. Check that the spoken consonant sounds match "+digits+"."}));
-   const updated=await api("/api/encode?number="+encodeURIComponent(number)+"&target="+target);
-   setResult(updated);
-   if(libraryOpen)loadLibrary();
-  } catch(e){setCustomMessages(v=>({...v,[digits]:e.message}));}
+   const check=await api("/api/check-word?word="+encodeURIComponent(value)+"&digits="+digits);
+   if(check.found&&!check.ok){say("'"+value+"' maps to "+(check.digits||"no digits")+", not "+digits+".");return;}
+   const list=addWord(loadWords(),value,digits);
+   if(!saveWords(list)){say("Your browser blocked saving. Check private mode or storage settings.");return;}
+   say(check.found?"Saved in this browser. Pronunciation verified by the dictionary.":"Saved in this browser. Check that the spoken consonant sounds match "+digits+".");
+   if(libraryOpen)setLibrary(list);
+   const chunks=result.chunks.map(c=>c.digits===digits?{...c,word:value,alternatives:mineFirst(c.alternatives||[],digits,list)}:c);
+   const r=await story(chunks.map(c=>c.word),chunks.map(c=>c.digits),0);
+   setResult(v=>({...v,chunks,story:r.story}));
+  } catch(e){say(e.message);}
  }
- async function loadLibrary() {
-  try {const r=await api("/api/personal-words");setLibrary(r.words);setLibraryOpen(true);}
-  catch(e){setError(e.message);}
- }
- async function removeLibraryWord(word,digits) {
-  try {
-   await api("/api/personal-words?word="+encodeURIComponent(word)+"&digits="+digits,{method:"DELETE"});
-   await loadLibrary();
-   if(number)create();
-  } catch(e){setError(e.message);}
+ function loadLibrary() {setLibrary(loadWords());setLibraryOpen(true);}
+ function removeLibraryWord(word,digits) {
+  const list=removeWord(loadWords(),word,digits);
+  if(!saveWords(list)){setError("Your browser blocked saving.");return;}
+  setLibrary(list);
+  if(number)create();
  }
  async function checkOwn(e) {
   e.preventDefault();
@@ -539,7 +549,7 @@ export default function App() {
     {view==="review"&&<>
      <Review items={reviews} revealed={revealedReviews} onReveal={id=>{const isRevealed=revealedReviews.includes(id);if(!isRevealed){const item=reviews.find(entry=>entry.id===id);if(item&&item.dueAt<=Date.now())reviewRatingLocks.current.delete(id);}setRevealedReviews(current=>current.includes(id)?current.filter(value=>value!==id):[...current,id]);}} onRate={rateReview} onCreate={()=>go("create")}/>
      <div className="input-panel progress-extra"><span className="eyebrow">YOUR LEARNING</span><h2>Practice statistics</h2><Progress scores={scores} onClear={()=>{setScores([]);saveScores([]);}}/></div>
-     <div className="input-panel personal-library"><div className="result-head"><div><span className="eyebrow">YOUR CUSTOM VOCABULARY</span><h2>Personal Word Library</h2><p>Words you save are preferred whenever the same number group appears again.</p></div><Button kind="secondary" onClick={loadLibrary}>{libraryOpen?"Refresh library":"View saved words"}</Button></div>{libraryOpen&&<div className="library-list">{library.length?library.map((item,i)=><div className="library-item" key={item.word+"-"+item.digits}><span><b>{item.word}</b><small>{item.digits}</small></span><button onClick={()=>removeLibraryWord(item.word,item.digits)}>Remove</button></div>):<p className="hint">No personal words saved yet. Add one to a number group above.</p>}</div>}</div>
+     <div className="input-panel personal-library"><div className="result-head"><div><span className="eyebrow">YOUR CUSTOM VOCABULARY</span><h2>Personal Word Library</h2><p>Saved in this browser only. Your words are preferred whenever the same number group appears again.</p></div><Button kind="secondary" onClick={loadLibrary}>{libraryOpen?"Refresh library":"View saved words"}</Button></div>{libraryOpen&&<div className="library-list">{library.length?library.map((item,i)=><div className="library-item" key={item.word+"-"+item.digits}><span><b>{item.word}</b><small>{item.digits}</small></span><button onClick={()=>removeLibraryWord(item.word,item.digits)}>Remove</button></div>):<p className="hint">No personal words saved yet. Add one to a number group above.</p>}</div>}</div>
     </>}
     {view==="history"&&<section><div className="hero"><span className="eyebrow">YOUR LIBRARY</span><h1>Your saved <em>stories.</em></h1><p>Every story you save lives here. Open one to keep working on it, or read it again to recall the number.</p></div><History items={history} onOpen={openSaved} onRename={renameStory} onDelete={deleteStory} onCreate={()=>go("create")}/></section>}
    </section>}

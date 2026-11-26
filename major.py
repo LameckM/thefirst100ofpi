@@ -227,7 +227,7 @@ def clean_number(raw):
     return re.sub(r"\D", "", raw or "")
 
 
-def segment(conn, digits, target=3, max_len=4, alt_count=12, compounds=True):
+def segment(conn, digits, target=3, max_len=4, alt_count=12, compounds=True, personal=True):
     """Split digits into consecutive, fixed-width chunks.
 
     The selected target is a grouping size, not a scoring preference:
@@ -246,13 +246,13 @@ def segment(conn, digits, target=3, max_len=4, alt_count=12, compounds=True):
     used = set()
     for i in range(0, len(digits), target):
         chunk_digits = digits[i:i + target]
-        personal = [
+        mine = [
             {"word": word, "score": 10_000.0}
-            for word in personal_words_for(conn, chunk_digits, alt_count)
+            for word in (personal_words_for(conn, chunk_digits, alt_count) if personal else [])
         ]
-        candidates = personal + [
+        candidates = mine + [
             item for item in words_for(conn, chunk_digits, alt_count)
-            if item["word"] not in {saved["word"] for saved in personal}
+            if item["word"] not in {saved["word"] for saved in mine}
         ]
         if not candidates and compounds and len(chunk_digits) >= 3:
             candidates = compound_words(conn, chunk_digits, alt_count)

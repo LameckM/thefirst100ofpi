@@ -2,7 +2,6 @@
 
 Run: uvicorn app:app --reload
 """
-from contextlib import asynccontextmanager
 from pathlib import Path
 import re
 import sqlite3
@@ -13,8 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from major import (
-    build_story, clean_number, compound_words, connect, decode_word, delete_personal_word,
-    ensure_personal_words, save_personal_word, segment, validate_personal_word, words_for,
+    build_story, clean_number, compound_words, connect, decode_word, segment, words_for,
 )
 from quiz import make_question
 
@@ -24,18 +22,7 @@ ROOT = Path(__file__).resolve().parent
 STATIC = ROOT / "static"
 FRONTEND_DIST = ROOT / "frontend" / "dist"
 
-@asynccontextmanager
-async def lifespan(_app):
-    """Create the personal-words schema once at startup, not per read."""
-    conn = connect()
-    try:
-        ensure_personal_words(conn)
-    finally:
-        conn.close()
-    yield
-
-
-app = FastAPI(title="Number Stories", lifespan=lifespan)
+app = FastAPI(title="Number Stories")
 
 
 def get_db():
@@ -47,11 +34,6 @@ def get_db():
         conn.close()
 
 
-
-
-class PersonalWordRequest(BaseModel):
-    word: str
-    digits: str
 
 
 class StoryRequest(BaseModel):
@@ -72,57 +54,13 @@ def encode(
         raise HTTPException(400, "Enter at least one digit.")
     if len(digits) > MAX_DIGITS:
         raise HTTPException(400, f"Keep it to {MAX_DIGITS} digits or fewer.")
-    chunks = segment(conn, digits, target=target, compounds=compounds)
+    chunks = segment(conn, digits, target=target, compounds=compounds, personal=False)
     if not chunks:
         raise HTTPException(422, "Could not find words for that number.")
     matched = [c for c in chunks if c["word"]]
     story = build_story([c["word"] for c in matched], [c["digits"] for c in matched])
     return {"digits": digits, "grouped": "-".join(c["digits"] for c in chunks),
             "chunks": chunks, "story": story}
-
-
-@app.get("/api/personal-words")
-def list_personal_words(conn: sqlite3.Connection = Depends(get_db)):
-    rows = conn.execute(
-        "SELECT word, digits, created_at FROM user_data.personal_words "
-        "ORDER BY created_at DESC, word"
-    ).fetchall()
-    return {"words": [dict(row) for row in rows]}
-
-
-@app.post("/api/personal-words")
-def add_personal_word(req: PersonalWordRequest, conn: sqlite3.Connection = Depends(get_db)):
-    word = req.word.strip().lower()
-    digits = req.digits.strip()
-    if not word or not re.fullmatch(WORD_RE, word):
-        raise HTTPException(400, "Enter a valid word (letters, apostrophes or hyphens only).")
-    if not re.fullmatch(r"\d{1,4}", digits):
-        raise HTTPException(400, "The number group must contain 1 to 4 digits.")
-    valid, validation = validate_personal_word(word, digits)
-    if not valid:
-        raise HTTPException(422, f"'{word}' maps to {validation}, not {digits}.")
-    save_personal_word(conn, word, digits)
-    return {
-        "saved": True,
-        "word": word,
-        "digits": digits,
-        "verification": "dictionary" if validation == "dictionary" else "user-confirmed",
-        "message": (
-            "Pronunciation matched the dictionary."
-            if validation == "dictionary"
-            else "Custom mapping saved. Make sure the spoken consonant sounds match this number."
-        ),
-    }
-
-
-@app.delete("/api/personal-words")
-def remove_personal_word(
-    word: str = Query(...),
-    digits: str = Query(..., pattern=r"^\d{1,4}$"),
-    conn: sqlite3.Connection = Depends(get_db),
-):
-    delete_personal_word(conn, word.strip().lower(), digits)
-    return {"deleted": True}
 
 
 @app.get("/api/words")
@@ -148,8 +86,8 @@ def story(req: StoryRequest):
         for i, word in enumerate(req.words)
         if word and word.strip()
     ]
-    if not pairs or len(pairs) > 120:
-        raise HTTPException(400, "Send between 1 and 120 non-empty words.")
+    if not pairs or len(pairs) > MAX_DIGITS // 2:
+        raise HTTPException(400, "Send between 1 and 150 non-empty words.")
     words, digits = zip(*pairs)
     return {"story": build_story(list(words), list(digits), req.variant)}
 

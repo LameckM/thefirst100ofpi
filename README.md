@@ -50,14 +50,11 @@ To rebuild the dictionary after updating the project dependencies:
 python build_db.py
 ```
 
-The rebuild replaces only the shared dictionary. Personal vocabulary is stored separately in the local, Git-ignored `personal.db`, so rebuilding the dictionary does not erase saved custom words.
+The rebuild replaces only the shared dictionary.
 
-When a suggested word is missing or does not suit you, add a custom word to that number group in the Create view. The API checks its CMU pronunciation against the exact digit group before saving it. Saved words are stored in the local, Git-ignored `personal.db` database and are preferred in future encodings on that installation. On first startup after this change, any existing `personal_words` entries are migrated from `major.db` into `personal.db`.
+## Personal Word Library
 
-Personal-word endpoints:
-- `GET /api/personal-words`
-- `POST /api/personal-words` with `{"word":"tarot","digits":"14"}`
-- `DELETE /api/personal-words?word=tarot&digits=14`
+When a suggested word is missing or does not suit you, add a custom word to that number group in the Create view. Dictionary words are checked against the exact digit group before saving. Saved words stay in the visitor's browser only, so visitors never see each other's words, and clearing site data removes them. The server has no endpoint that writes data.
 
 ## Compound words for numbers with no word
 
