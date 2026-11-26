@@ -585,3 +585,12 @@ main { width:calc(100% - 80px); max-width:1480px; margin-inline:auto; }
 .pi-wrong{color:var(--no);background:var(--no-bg)}
 .pi-hint{color:var(--soft);border-bottom:3px dashed var(--soft)}
 @media(max-width:720px){.pi-board{font-size:21px;padding:14px}}
+
+.pi-targets{margin:0 0 18px}
+.pi-progress{display:flex;align-items:center;gap:12px;margin-top:6px}
+.pi-progress progress{flex:1;min-width:0;height:12px;border:0;border-radius:999px;overflow:hidden;background:var(--line);appearance:none}
+.pi-progress progress::-webkit-progress-bar{background:var(--line)}
+.pi-progress progress::-webkit-progress-value{background:var(--go);transition:width .4s ease}
+.pi-progress progress::-moz-progress-bar{background:var(--go)}
+.pi-progress b{min-width:4ch;text-align:right;color:var(--go);font-variant-numeric:tabular-nums}
+.pi-win{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-top:14px;padding:14px 16px;border-radius:12px;background:var(--go-bg)}
