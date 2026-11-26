@@ -34,11 +34,11 @@ export default function Pi(){
      <button type="button" className="button secondary" onClick={restart}>Start over</button>
     </div>
    </div>
-   <div className="pi-board" onClick={()=>input.current.focus()}>
-    <span>3.</span><span className="pi-right">{PI.slice(0,count)}</span>{wrong&&<span className="pi-wrong">{wrong}</span>}{peek&&<span className="pi-hint">{PI[count]}</span>}
+   <div className="pi-board">
+    <span>3.</span><span className="pi-right">{PI.slice(0,count)}</span>{wrong&&<span className="pi-wrong">{wrong}</span>}{peek&&<span className="pi-hint">{PI[count]}</span>}{!done&&<span className="pi-caret" aria-hidden="true"/>}
+    <input ref={input} value="" onChange={e=>type(e.target.value)} inputMode="numeric" autoComplete="off" aria-label="Type the next digit of pi" disabled={done}/>
    </div>
-   <label htmlFor="pi-input">{done?"All 100 digits. Well done.":"Next digit"}</label>
-   <div className="input-row"><input id="pi-input" ref={input} value="" onChange={e=>type(e.target.value)} inputMode="numeric" autoComplete="off" placeholder="Type here" disabled={done}/></div>
+   <p className="hint">{done?"All 100 digits. Well done.":"Click or tap the box, then type."}</p>
    <p className="hint" role="status">{wrong?wrong+" is wrong. Try again.":peek?"Hint: the next digit is "+PI[count]+".":count+" correct."}{peeked&&" Hint used, so this run will not change your best."}</p>
   </div>
  </section>;
