@@ -428,23 +428,27 @@ footer{border-top:1px solid var(--line)}
 
 
 
-/* Responsive layout correction — prevent page-level horizontal scrolling */
+/* Responsive layout correction
+   Keep the existing phone layout intact. Desktop rules below follow the
+   current React tree: .storyboard contains .word-grid and .scene-focus. */
 html, body, #root { width:100%; max-width:100%; }
-html { overflow-x:clip; }
-body { overflow-x:clip; }
-.shell { width:100%; max-width:100%; overflow-x:clip; }
-main { width:100%; max-width:1180px; min-width:0; margin-inline:auto; }
-.topbar { width:100%; min-width:0; }
+html, body { overflow-x:clip; }
+.shell { width:100%; max-width:100%; min-height:100vh; }
+.topbar, main { min-width:0; }
+main { width:calc(100% - 80px); max-width:1480px; margin-inline:auto; }
 .topbar > * { min-width:0; }
-.results, .storyboard, .story-panel, .input-panel, .progress-page { min-width:0; max-width:100%; }
-.word-grid, .digit-grid, .review-list { min-width:0; }
-.word-card, .review-card, .scene-focus { min-width:0; overflow-wrap:anywhere; }
-.input-row, .result-head, .scene-focus, .scene-controls { min-width:0; }
-.input-row input { width:100%; }
+.results, .storyboard, .story-panel, .input-panel, .progress-page,
+.word-grid, .digit-grid, .review-list, .word-card, .review-card,
+.scene-focus, .input-row, .result-head, .scene-controls {
+  min-width:0;
+  max-width:100%;
+}
+.word-card, .review-card, .scene-focus { overflow-wrap:anywhere; }
+.input-row input { width:100%; min-width:0; }
 
-/* Phone and narrow tablet: keep navigation pinned and stack content naturally */
-@media (max-width: 800px) {
-  body { padding-bottom: calc(68px + env(safe-area-inset-bottom)); }
+/* Mobile: retain the currently working layout and fixed bottom navigation. */
+@media (max-width:800px) {
+  body { padding-bottom:calc(68px + env(safe-area-inset-bottom)); }
   .topbar {
     display:flex;
     align-items:center;
@@ -480,7 +484,7 @@ main { width:100%; max-width:1180px; min-width:0; margin-inline:auto; }
     white-space:normal;
     font-size:14px;
   }
-  main { padding:28px 16px 44px; }
+  main { width:100%; padding:28px 16px 44px; }
   .results { display:flex; flex-direction:column; gap:16px; }
   .word-grid {
     display:grid;
@@ -493,12 +497,7 @@ main { width:100%; max-width:1180px; min-width:0; margin-inline:auto; }
     scroll-snap-type:none;
   }
   .word-card { width:100%; min-width:0; }
-  .alternatives {
-    display:flex;
-    flex-wrap:wrap;
-    max-width:100%;
-    overflow:visible;
-  }
+  .alternatives { display:flex; flex-wrap:wrap; max-width:100%; overflow:visible; }
   .alternatives small { width:100%; }
   .alternatives button { max-width:100%; white-space:normal; }
   .scene-focus { width:100%; flex-direction:column; align-items:stretch; gap:14px; }
@@ -511,39 +510,65 @@ main { width:100%; max-width:1180px; min-width:0; margin-inline:auto; }
   footer { min-width:0; }
 }
 
-/* Desktop: clear hierarchy, bounded reading width and predictable grids */
-@media (min-width: 801px) {
-  main {
-    width:calc(100% - 64px);
-    max-width:1320px;
-    padding:48px 0 80px;
-  }
+/* Desktop and laptop: use the available width with deliberate page layouts. */
+@media (min-width:801px) {
+  main { padding:48px 0 80px; }
   .topbar {
     display:grid;
-    grid-template-columns:minmax(180px,1fr) auto minmax(180px,1fr);
+    grid-template-columns:minmax(220px,1fr) auto minmax(220px,1fr);
     align-items:center;
-    gap:24px;
-    padding:12px max(32px,calc((100vw - 1320px)/2));
+    gap:28px;
+    padding:14px max(40px,calc((100vw - 1480px)/2));
   }
   .topbar nav { justify-content:center; }
+  .topbar nav button { padding-inline:14px; }
   .header-actions { justify-content:flex-end; }
-  .hero { max-width:820px; }
+  .hero { max-width:900px; }
+  .hero p { max-width:68ch; }
+  .lesson { max-width:1040px; margin-inline:auto; }
+  .quiz-panel { max-width:920px; margin-inline:auto; }
+  .digit-grid { grid-template-columns:repeat(5,minmax(0,1fr)); gap:14px; }
+  .review-stats { gap:18px; }
+  .review-list { grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:18px; }
+  .history-list { grid-template-columns:repeat(auto-fit,minmax(360px,1fr)); gap:20px; }
+  .word-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
   .results {
+    display:grid;
     grid-template-columns:minmax(0,1fr);
+    grid-template-areas:none;
+    align-items:start;
     gap:22px;
   }
-  .word-grid { grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:16px; }
+  .results > * { min-width:0; }
+  .results > .result-head,
+  .results > .storyboard,
+  .results > .story-panel { grid-area:auto; }
+  .storyboard { width:100%; }
   .scene-focus { align-items:center; }
-  .digit-grid { grid-template-columns:repeat(5,minmax(0,1fr)); gap:12px; }
-  .review-list { grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); }
 }
-@media (min-width: 1100px) {
+
+/* Wide desktop: two purposeful columns, with the story beside the scenes. */
+@media (min-width:1100px) {
   .results {
-    grid-template-columns:minmax(0,1fr) 360px;
-    grid-template-areas:"head story" "grid story";
-    align-items:start;
+    grid-template-columns:minmax(0,1fr) minmax(320px,0.42fr);
+    grid-template-areas:"heading heading" "scenes story";
+    column-gap:28px;
+    row-gap:22px;
   }
-  .results > .result-head { grid-area:head; }
-  .results > .word-grid { grid-area:grid; grid-template-columns:repeat(2,minmax(0,1fr)); }
-  .results > .story-panel { grid-area:story; position:sticky; top:20px; max-height:calc(100vh - 40px); overflow-y:auto; }
+  .results > .result-head { grid-area:heading; }
+  .results > .storyboard { grid-area:scenes; }
+  .results > .story-panel {
+    grid-area:story;
+    position:sticky;
+    top:20px;
+    max-height:calc(100vh - 40px);
+    overflow-y:auto;
+  }
+  .results:has(.recall-active) {
+    grid-template-columns:minmax(0,1fr);
+    grid-template-areas:none;
+  }
+  .results:has(.recall-active) > .result-head,
+  .results:has(.recall-active) > .storyboard { grid-area:auto; }
+  .results:has(.recall-active) > .storyboard { max-width:1100px; width:100%; margin-inline:auto; }
 }
