@@ -407,12 +407,12 @@ footer{border-top:1px solid var(--line)}
 .optional-section>.input-panel{margin:0;border:0;border-top:1px solid var(--line);border-radius:0;box-shadow:none}
 .recall-active .word-grid{display:none}
 .recall-active .storyboard-track{margin-bottom:18px;height:6px}
-.recall-active+.scene-focus{margin-top:0}
+.recall-active .scene-focus{margin-top:0}
 .scene-focus{position:relative;bottom:auto;z-index:auto;box-shadow:0 4px 16px rgba(41,56,58,.07)}
-.recall-active+.scene-focus{min-height:clamp(300px,48vh,520px);justify-content:space-between}
-.recall-active+.scene-focus>div:first-child{max-width:680px}
-.recall-active+.scene-focus h3{font-size:clamp(30px,5vw,46px);margin:14px 0}
-.recall-active+.scene-focus p{font-size:17px}
+.recall-active .scene-focus{min-height:clamp(300px,48vh,520px);justify-content:space-between}
+.recall-active .scene-focus>div:first-child{max-width:680px}
+.recall-active .scene-focus h3{font-size:clamp(30px,5vw,46px);margin:14px 0}
+.recall-active .scene-focus p{font-size:17px}
 .progress-page>.progress-tabs{margin-bottom:24px}
 @media(max-width:720px){
  .topbar nav{justify-content:stretch}
@@ -421,6 +421,6 @@ footer{border-top:1px solid var(--line)}
  .progress-tabs button{width:100%}
  .optional-section>summary{align-items:flex-start;flex-wrap:wrap}
  .optional-section>summary span{width:100%;margin:0;text-align:left}
- .recall-active+.scene-focus{min-height:0;padding:22px 18px}
- .recall-active+.scene-focus .scene-controls{grid-template-columns:1fr 1fr}
+ .recall-active .scene-focus{min-height:0;padding:22px 18px}
+ .recall-active .scene-focus .scene-controls{grid-template-columns:1fr 1fr}
 }
