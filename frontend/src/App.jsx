@@ -561,6 +561,6 @@ export default function App() {
     {finished&&<div className="input-panel"><span className="eyebrow">SESSION COMPLETE</span><div className="score">{round.score} / 10</div>{scores.length>1&&round.score>Math.max(...scores.slice(0,-1).map(s=>s.score))&&<p className="new-best">New personal best.</p>}<h2>{round.score===10?"Perfect round.":round.score>=8?"Strong recall.":round.score>=5?"You're making progress.":"Keep practising — repetition builds recall."}</h2>{round.missed.map((m,i)=><div className="missed" key={i}><b>{m.prompt}</b><p>Answer: {m.answer}</p><small>{m.explanation}</small></div>)}<Button onClick={start}>Start another round ↗</Button> <Button kind="secondary" onClick={()=>setRound(null)}>Change settings</Button></div>}
    </section>}
   </main>
-  <footer><span className="brand-icon small">N<span>.</span></span><b>NUMBER STORIES</b><span>Turn numbers into stories worth remembering.</span></footer>
+  <footer><span className="brand-icon small">N<span>.</span></span><b>NUMBER STORIES</b><span>Turn numbers into stories worth remembering.</span><a href="/privacy.html">Privacy</a></footer>
  </div>;
 }

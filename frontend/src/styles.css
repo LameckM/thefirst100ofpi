@@ -594,3 +594,9 @@ main { width:calc(100% - 80px); max-width:1480px; margin-inline:auto; }
 .pi-progress progress::-moz-progress-bar{background:var(--go)}
 .pi-progress b{min-width:4ch;text-align:right;color:var(--go);font-variant-numeric:tabular-nums}
 .pi-win{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-top:14px;padding:14px 16px;border-radius:12px;background:var(--go-bg)}
+
+/* Contrast: keep text at 4.5:1 or better */
+:root:not([data-theme="dark"]){--soft:#5C6A6A}
+.topbar nav button.active,.progress-tabs button.active,.button.primary{color:#162021}
+.button.primary:hover{background:#A63F35;border-color:#A63F35;color:#fff}
+footer a{color:inherit;display:inline-block;padding:10px 0}

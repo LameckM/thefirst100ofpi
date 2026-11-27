@@ -134,3 +134,6 @@ def index():
 if FRONTEND_DIST.is_dir():
     app.mount("/assets", StaticFiles(directory=FRONTEND_DIST / "assets"), name="assets")
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
+# Last, so it never shadows the routes above: favicon, social image, privacy page.
+if FRONTEND_DIST.is_dir():
+    app.mount("/", StaticFiles(directory=FRONTEND_DIST), name="public")
