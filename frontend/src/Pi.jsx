@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { PI, TARGETS, guess, percent } from "./pi.js";
+import { PI, TARGETS, guess, percent, hintsLeft } from "./pi.js";
 
 const BEST_KEY="number-stories-pi-best";
 function loadBest(){try{const n=Number(localStorage.getItem(BEST_KEY));return Number.isInteger(n)&&n>0?Math.min(n,1000000):0;}catch{return 0;}}
@@ -8,7 +8,7 @@ export default function Pi(){
  const [run,setRun]=useState({count:0,wrong:""});
  const [best,setBest]=useState(loadBest);
  const [peek,setPeek]=useState(false);
- const [peeked,setPeeked]=useState(false);
+ const [used,setUsed]=useState(0);
  const [target,setTarget]=useState(TARGETS[0]);
  const [digits,setDigits]=useState(PI);
  const [loading,setLoading]=useState("");
@@ -19,6 +19,8 @@ export default function Pi(){
  useEffect(()=>{if(refocus.current){refocus.current=false;input.current.focus();}},[target]);
  const {count,wrong}=run;
  const done=count>=target;
+ const left=hintsLeft(target,used);
+ const peeked=used>0;
  const next=TARGETS[TARGETS.indexOf(target)+1];
  // Keeps the digits already typed when moving up; moving below them starts again.
  async function choose(value){
@@ -30,7 +32,7 @@ export default function Pi(){
   }
   if(wanted.current!==value)return; // another goal was picked while loading
   setLoading("");setTarget(value);setPeek(false);
-  if(count>value){setRun({count:0,wrong:""});setPeeked(false);}
+  if(count>value){setRun({count:0,wrong:""});setUsed(0);}
  }
  function type(text){
   if(!/\d/.test(text))return;
@@ -39,7 +41,7 @@ export default function Pi(){
   // A run that used a hint does not set a personal best.
   if(!peeked&&result.count>best){setBest(result.count);try{localStorage.setItem(BEST_KEY,String(result.count));}catch{}}
  }
- function restart(){setRun({count:0,wrong:""});setPeek(false);setPeeked(false);input.current.focus();}
+ function restart(){setRun({count:0,wrong:""});setPeek(false);setUsed(0);input.current.focus();}
  return <section>
   <div className="hero"><span className="eyebrow">MEMORY CHALLENGE</span><h1>Recall <em>pi.</em></h1><p>Type the digits after 3. one at a time. Green is right. Red is wrong, and your next guess replaces it.</p></div>
   <div className="target-row pi-targets" role="group" aria-label="How many digits to recall"><span>My goal</span>
@@ -54,7 +56,7 @@ export default function Pi(){
   <div className="input-panel">
    <div className="result-head"><h2>Keep the sequence going</h2>
     <div className="storyboard-actions">
-     <button type="button" className="button secondary" disabled={done} onClick={()=>{setRun({count,wrong:""});setPeek(true);setPeeked(true);input.current.focus();}}>Hint</button>
+     <button type="button" className="button secondary" disabled={done||peek||!left} onClick={()=>{setRun({count,wrong:""});setPeek(true);setUsed(used+1);input.current.focus();}}>{target>100?"No hints":"Hint ("+left+" left)"}</button>
      <button type="button" className="button secondary" onClick={restart}>Start over</button>
     </div>
    </div>

@@ -2,6 +2,10 @@ export const PI="141592653589793238462643383279502884197169399375105820974944592
 
 export const TARGETS=[25,50,100,1000000];
 
+// Hints per run. They carry over when the goal changes, and the biggest goal has none.
+export const HINTS={25:5,50:8,100:10,1000000:0};
+export function hintsLeft(target,used){return Math.max(0,HINTS[target]-used);}
+
 // Whole numbers up to 100 digits; four decimals for longer targets so each digit visibly counts.
 export function percent(count,target){return target>100?(count/target*100).toFixed(4)+"%":Math.floor(count*100/target)+"%";}
 

@@ -1,7 +1,7 @@
 import {test} from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
-import {PI,guess,percent} from "./pi.js";
+import {PI,guess,percent,hintsLeft} from "./pi.js";
 
 test("PI holds the first 100 decimals (Machin formula)",()=>{
  const one=10n**110n;
@@ -27,4 +27,12 @@ test("million-digit file, targets and percentages",()=>{
  assert.equal(percent(5,25),"20%");
  assert.equal(percent(25,50),"50%");
  assert.equal(percent(1,1000000),"0.0001%");
+});
+
+test("hint allowance carries over between goals",()=>{
+ assert.equal(hintsLeft(25,0),5);
+ assert.equal(hintsLeft(50,5),3);
+ assert.equal(hintsLeft(100,8),2);
+ assert.equal(hintsLeft(25,8),0);
+ assert.equal(hintsLeft(1000000,0),0);
 });
